@@ -131,7 +131,8 @@ openclaw doctor --generate-gateway-token
 
 **Verification:**
 ```bash
-openclaw security audit --check gateway-auth
+openclaw security audit --deep
+# Check Gateway auth status in output
 ```
 
 **OpenClaw Docs:** [Security - Gateway WebSocket Auth](https://docs.openclaw.ai/gateway/security#05-lock-down-the-gateway-websocket-local-auth)
@@ -361,7 +362,11 @@ openclaw sandbox explain
 {
   tools: {
     elevated: {
-      allowFrom: ["+15555550123"]  // Only this sender can use elevated
+      enabled: true,
+      allowFrom: {
+        whatsapp: ["+15555550123"],  // Per-provider allowlists
+        discord: ["user-id-here"]
+      }
     }
   }
 }
@@ -915,12 +920,8 @@ Ensure all L1 and L2 controls are implemented.
 }
 ```
   </Step>
-  <Step title="Run Formal Verification">
-```bash
-git clone https://github.com/vignesh07/openclaw-formal-models
-cd openclaw-formal-models
-make all
-```
+  <Step title="Verify Formal Models (Optional)">
+See [OpenClaw Formal Verification](https://docs.openclaw.ai/security/formal-verification/) for TLA+/TLC model details and verification procedures.
   </Step>
 </Steps>
 
@@ -929,8 +930,7 @@ make all
 - [ ] All sessions sandboxed (`mode: "all"`)
 - [ ] No workspace access from sandbox (`workspaceAccess: "none"`)
 - [ ] mDNS discovery disabled
-- [ ] Formal verification models pass
-- [ ] Negative models produce expected counterexamples
+- [ ] Review formal verification documentation
 
 ---
 
