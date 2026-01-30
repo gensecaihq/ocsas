@@ -6,6 +6,61 @@
 
 **OCSAS** is the official [OSSASAI](https://github.com/gensecaihq/ossasai) implementation profile for [OpenClaw](https://openclaw.ai) — a multi-platform AI agent gateway for WhatsApp, Telegram, Discord, iMessage, and Slack with shell, filesystem, and browser access.
 
+## How This Framework Works
+
+> **Important:** OpenClaw is not maintained by us. OCSAS is an **external compliance framework** that documents OpenClaw's existing security features — it does not require any changes to OpenClaw itself.
+
+### The Relationship
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      OpenClaw (Third-Party Product)                  │
+│                                                                      │
+│  Already has: openclaw security audit, dmPolicy, sandbox,           │
+│               gateway.auth, and all security features we document    │
+│                                                                      │
+│  Does NOT know about OCSAS/OSSASAI — and doesn't need to            │
+└─────────────────────────────────────────────────────────────────────┘
+                              ▲
+                              │ We observe & document
+                              │
+┌─────────────────────────────────────────────────────────────────────┐
+│                    OCSAS (This Repository)                           │
+│                                                                      │
+│  • Maps OpenClaw's existing features to OSSASAI security controls   │
+│  • Provides compliance checklists for auditors                       │
+│  • Gives users structured deployment guidance                        │
+│  • Uses OpenClaw's own CLI for verification                          │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Analogy: Industry Standards
+
+| Standard | Target Software | Does Software Know About It? |
+|----------|----------------|------------------------------|
+| CIS Ubuntu Benchmark | Ubuntu Linux | No - CIS documents existing settings |
+| OWASP ASVS | Any web app | No - ASVS verifies existing features |
+| PCI-DSS | Payment systems | No - auditors check existing configs |
+| **OCSAS** | **OpenClaw** | **No - we document existing features** |
+
+### What OCSAS Does
+
+1. **Documentation Layer** - Maps OpenClaw features to security controls
+2. **Verification** - Uses OpenClaw's own CLI (`openclaw security audit`)
+3. **Compliance Evidence** - Structured output for auditors
+4. **Deployment Guidance** - L1/L2/L3 conformance recipes
+
+### Who Uses OCSAS?
+
+| User | How They Use OCSAS |
+|------|-------------------|
+| **OpenClaw users** | Deployment checklists, hardening guides |
+| **Security auditors** | Compliance verification framework |
+| **Enterprises** | Risk assessment, vendor due diligence |
+| **Regulators** | Structured security evaluation criteria |
+
+---
+
 ## Overview
 
 OCSAS maps OSSASAI's 24 security controls to OpenClaw's built-in security features, providing structured verification for secure AI agent deployments.
@@ -20,8 +75,20 @@ Trust Boundaries        →    Verification Steps        →    Built-in Feature
 
 ## Quick Start
 
+### Step 1: Install OpenClaw (if not already installed)
+
 ```bash
-# Verify your OpenClaw deployment
+curl -fsSL https://openclaw.bot/install.sh | bash
+openclaw onboard --install-daemon
+```
+
+### Step 2: Verify Security Baseline
+
+```bash
+# Health check
+openclaw health
+
+# Security audit (uses OpenClaw's built-in auditor)
 openclaw security audit --deep
 
 # Auto-fix common issues
@@ -30,6 +97,49 @@ openclaw security audit --fix
 # Check sandbox configuration
 openclaw sandbox explain
 ```
+
+### Step 3: Choose Your Assurance Level
+
+| Level | Name | When to Use | Key Config |
+|-------|------|-------------|------------|
+| **L1** | Local-First | Single-user, development | Loopback + auth + pairing |
+| **L2** | Network-Aware | Teams, LAN/Tailnet | L1 + sandboxing + isolation |
+| **L3** | High-Assurance | Production, regulated | L2 + all sandboxed + mDNS off |
+
+### Step 4: Apply Configuration
+
+**L1 Baseline:**
+```json5
+{
+  gateway: { bind: "loopback", auth: { mode: "token", token: "your-token" } },
+  channels: { whatsapp: { dmPolicy: "pairing" } }
+}
+```
+
+**L2 Additions:**
+```json5
+{
+  session: { dmScope: "per-channel-peer" },
+  agents: { defaults: { sandbox: { mode: "non-main" } } },
+  channels: { whatsapp: { groups: { "*": { requireMention: true } } } }
+}
+```
+
+**L3 Additions:**
+```json5
+{
+  agents: { defaults: { sandbox: { mode: "all", workspaceAccess: "none" } } },
+  discovery: { mdns: { mode: "off" } }
+}
+```
+
+### Step 5: Verify Continuously
+
+```bash
+openclaw security audit --deep  # Run regularly after config changes
+```
+
+---
 
 ## Control Mappings
 
@@ -47,55 +157,67 @@ openclaw sandbox explain
 
 [View complete mappings →](profiles/openclaw.mdx)
 
-## Assurance Levels
+---
 
-| Level | Name | When to Use |
-|-------|------|-------------|
-| **L1** | Local-First | Single-user, loopback-only, development |
-| **L2** | Network-Aware | Multi-user, LAN/Tailnet, team deployments |
-| **L3** | High-Assurance | Production, public exposure, regulated environments |
+## Assurance Level Checklists
 
-### L1 Checklist
+### L1 Checklist (Local-First)
 
 ```bash
 openclaw security audit --deep
 ```
 
-- [ ] Gateway bound to loopback
-- [ ] Gateway auth configured
+- [ ] Gateway bound to loopback (`gateway.bind: "loopback"`)
+- [ ] Gateway auth configured (token or password)
 - [ ] DM policy set to `pairing` or `allowlist`
-- [ ] File permissions correct (700/600)
-- [ ] Log redaction enabled
+- [ ] File permissions correct (`~/.openclaw/` = 700, config = 600)
+- [ ] Log redaction enabled (`logging.redactSensitive: "tools"`)
 
 ### L2 Checklist (includes L1)
 
-- [ ] Trusted proxies configured (if applicable)
-- [ ] Mention gating enabled for groups
+- [ ] Session isolation configured (`session.dmScope`)
+- [ ] Mention gating enabled for groups (`requireMention: true`)
 - [ ] Sandboxing enabled for non-main sessions
-- [ ] Elevated exec restricted
+- [ ] Elevated exec restricted (`tools.elevated.allowFrom`)
+- [ ] Trusted proxies configured (if using reverse proxy)
 
 ### L3 Checklist (includes L2)
 
-- [ ] Strictest session isolation
-- [ ] All sessions sandboxed
-- [ ] mDNS discovery disabled
-- [ ] No workspace access from sandbox
+- [ ] Strictest session isolation (`per-account-channel-peer`)
+- [ ] All sessions sandboxed (`sandbox.mode: "all"`)
+- [ ] No workspace access from sandbox (`workspaceAccess: "none"`)
+- [ ] mDNS discovery disabled (`mdns.mode: "off"`)
+
+---
 
 ## Evidence Generation
 
+Generate compliance evidence for auditors using OpenClaw's own tools:
+
 ```bash
 mkdir -p evidence
-openclaw security audit --deep 2>&1 | tee evidence/audit.txt
-openclaw status --all > evidence/status.txt
-openclaw sandbox explain > evidence/sandbox.txt
+
+# Security audit report
+openclaw security audit --deep 2>&1 | tee evidence/audit-report.txt
+
+# System status (secrets redacted)
+openclaw status --all > evidence/status-redacted.txt
+
+# Sandbox configuration
+openclaw sandbox explain > evidence/sandbox-config.txt
+
+# File permissions
 ls -la ~/.openclaw/ > evidence/permissions.txt
+stat -c "%a %n" ~/.openclaw/* >> evidence/permissions.txt
 ```
+
+---
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [profiles/openclaw.mdx](profiles/openclaw.mdx) | Complete control mappings |
+| [profiles/openclaw.mdx](profiles/openclaw.mdx) | Complete control mappings and conformance recipes |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
 | [SECURITY.md](SECURITY.md) | Security policy |
 
@@ -103,17 +225,18 @@ ls -la ~/.openclaw/ > evidence/permissions.txt
 
 | Project | Description |
 |---------|-------------|
-| [OSSASAI](https://github.com/gensecaihq/ossasai) | Parent security framework |
-| [OpenClaw](https://openclaw.ai) | AI agent gateway platform |
-| [OpenClaw Docs](https://docs.openclaw.ai/gateway/security) | Security documentation |
+| [OSSASAI](https://github.com/gensecaihq/ossasai) | Parent security framework (vendor-neutral) |
+| [OpenClaw](https://openclaw.ai) | AI agent gateway platform (third-party) |
+| [OpenClaw Security Docs](https://docs.openclaw.ai/gateway/security) | Official security documentation |
 
 ## Contributing
 
 Contributions welcome. Please ensure:
 
-1. Changes align with OSSASAI framework
-2. All claims are verified against OpenClaw documentation
-3. No placeholder or fictional information
+1. Changes align with OSSASAI framework structure
+2. All claims are verified against actual OpenClaw documentation
+3. No placeholder, fictional, or assumed information
+4. Use OpenClaw's existing CLI commands for verification steps
 
 ## License
 

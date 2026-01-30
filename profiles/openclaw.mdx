@@ -15,6 +15,79 @@ This profile maps OSSASAI controls to OpenClaw's existing security architecture,
 **OpenClaw Security Philosophy:** "Access control before intelligence." Most failures are not fancy exploits—they're "someone messaged the bot and the bot did what they asked." OpenClaw's stance: Identity first, scope next, model last.
 </Note>
 
+---
+
+## How This Framework Works
+
+<Warning>
+**Important:** OpenClaw is not maintained by us. OCSAS is an **external compliance framework** that documents OpenClaw's existing security features — it does not require any changes to OpenClaw itself.
+</Warning>
+
+### The Relationship
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      OpenClaw (Third-Party Product)                  │
+│                                                                      │
+│  Already has: openclaw security audit, dmPolicy, sandbox,           │
+│               gateway.auth, and all security features we document    │
+│                                                                      │
+│  Does NOT know about OCSAS/OSSASAI — and doesn't need to            │
+└─────────────────────────────────────────────────────────────────────┘
+                              ▲
+                              │ We observe & document
+                              │
+┌─────────────────────────────────────────────────────────────────────┐
+│                    OCSAS (This Profile)                              │
+│                                                                      │
+│  • Maps OpenClaw's existing features to OSSASAI security controls   │
+│  • Provides compliance checklists for auditors                       │
+│  • Gives users structured deployment guidance                        │
+│  • Uses OpenClaw's own CLI for verification                          │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Analogy: Industry Standards
+
+| Standard | Target Software | Does Software Know About It? |
+|----------|----------------|------------------------------|
+| CIS Ubuntu Benchmark | Ubuntu Linux | No - CIS documents existing settings |
+| OWASP ASVS | Any web app | No - ASVS verifies existing features |
+| PCI-DSS | Payment systems | No - auditors check existing configs |
+| **OCSAS** | **OpenClaw** | **No - we document existing features** |
+
+### What OCSAS Does
+
+| Function | Description |
+|----------|-------------|
+| **Documentation** | Maps OpenClaw features to OSSASAI security controls |
+| **Verification** | Uses OpenClaw's own CLI (`openclaw security audit`) |
+| **Compliance** | Provides structured output for auditors |
+| **Guidance** | L1/L2/L3 conformance recipes with exact config |
+
+### Who Uses OCSAS?
+
+| User | How They Use OCSAS |
+|------|-------------------|
+| **OpenClaw users** | Deployment checklists, hardening guides |
+| **Security auditors** | Compliance verification framework |
+| **Enterprises** | Risk assessment, vendor due diligence |
+| **Regulators** | Structured security evaluation criteria |
+
+### Verification Flow
+
+```
+OSSASAI Control: "OSSASAI-ID-01: Peer Verification"
+       ↓
+OCSAS Mapping: "OpenClaw implements this via dmPolicy: 'pairing'"
+       ↓
+Verification: "Run 'openclaw security audit' to check"
+       ↓
+Auditor: "Control ID-01 ✓ - Compliant"
+```
+
+---
+
 ## OpenClaw Security Architecture
 
 OpenClaw implements a defense-in-depth security model with the following layers:
