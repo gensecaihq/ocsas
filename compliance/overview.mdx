@@ -1,0 +1,98 @@
+---
+title: 'Compliance Overview'
+description: 'OSSASAI compliance program and certification process'
+---
+
+## Overview
+
+The OSSASAI compliance program provides a structured approach to achieving and maintaining conformance with OSSASAI security requirements.
+
+## Compliance Process
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  OSSASAI Compliance Process                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐            │
+│  │  Plan   │─►│ Assess  │─►│Remediate│─►│ Certify │            │
+│  └─────────┘  └─────────┘  └─────────┘  └─────────┘            │
+│                                               │                  │
+│                                               ▼                  │
+│                                          ┌─────────┐            │
+│  ◄─────────────────────────────────────  │ Monitor │            │
+│                                          └─────────┘            │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Compliance Levels
+
+| Level | Self-Assessment | Third-Party | Certification |
+|-------|:---------------:|:-----------:|:-------------:|
+| L1 | Sufficient | Optional | Self-Attested |
+| L2 | Sufficient | Recommended | Self or Third-Party |
+| L3 | Not Sufficient | Required | Third-Party Required |
+
+## Documentation Requirements
+
+<CardGroup cols={2}>
+  <Card title="Evidence Collection" icon="folder" href="/compliance/evidence-collection">
+    Required artifacts and evidence for each control
+  </Card>
+  <Card title="Reporting" icon="file-alt" href="/compliance/reporting">
+    Report templates and compliance statements
+  </Card>
+  <Card title="Continuous Monitoring" icon="chart-line" href="/compliance/continuous-monitoring">
+    Ongoing compliance verification
+  </Card>
+</CardGroup>
+
+## Key Deliverables
+
+### Assessment Package
+
+| Document | Description | Required For |
+|----------|-------------|--------------|
+| Scope Statement | Assessment boundaries | All levels |
+| Control Matrix | Implementation status | All levels |
+| Evidence Package | Supporting artifacts | All levels |
+| Gap Analysis | Identified deficiencies | If gaps exist |
+| Remediation Plan | Fix timeline | If gaps exist |
+
+### Compliance Statement
+
+```yaml
+compliance_statement:
+  organization: "Example Corp"
+  product: "AI Assistant"
+  version: "2.0.0"
+  ocsas_version: "1.0.0"
+  assurance_level: "L2"
+  assessment_date: "2025-01-15"
+  status: "Conformant"
+  exceptions: []
+  validity: "12 months"
+```
+
+## Compliance Timeline
+
+| Phase | Activities |
+|-------|------------|
+| **Week 1-2** | Scope definition, stakeholder alignment |
+| **Week 3-4** | Initial assessment, gap identification |
+| **Week 5-8** | Remediation implementation |
+| **Week 9-10** | Verification, evidence collection |
+| **Week 11** | Report generation, review |
+| **Week 12** | Certification, publication |
+| **Ongoing** | Continuous monitoring, maintenance |
+
+## Roles and Responsibilities
+
+| Role | Responsibilities |
+|------|------------------|
+| Compliance Lead | Coordinate assessment, manage timeline |
+| Technical Lead | Implement controls, provide evidence |
+| Security Team | Review controls, validate implementation |
+| Management | Approve scope, resources, final attestation |
+| Third-Party (L3) | Independent assessment, certification |

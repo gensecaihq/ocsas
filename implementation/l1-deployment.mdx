@@ -1,0 +1,387 @@
+---
+title: 'L1 Deployment Guide'
+description: 'Local-first secure deployment for individual developers'
+---
+
+## Overview
+
+L1 (Local-First) deployment is designed for individual developers or small teams where the AI assistant operates entirely on a local system without network connectivity requirements.
+
+## Target Environment
+
+| Characteristic | L1 Requirement |
+|----------------|----------------|
+| Network | Not required |
+| Users | Single user |
+| Data sensitivity | Non-regulated |
+| Deployment | Local workstation |
+
+## Deployment Steps
+
+### Step 1: Base Configuration
+
+Create the configuration file with secure defaults:
+
+```yaml
+# ~/.config/ocsas/config.yaml
+version: "1.0"
+assurance_level: "L1"
+
+# Core settings
+core:
+  mode: "local"
+  network_required: false
+```
+
+### Step 2: Filesystem Sandboxing (TB-01)
+
+Configure strict filesystem boundaries:
+
+```yaml
+# Filesystem configuration
+filesystem:
+  # Restrict to working directory
+  scope: "workdir"
+  root: "${PWD}"
+
+  # Symlink handling
+  follow_symlinks: false
+  validate_symlink_targets: true
+
+  # Explicit boundaries
+  allowed:
+    - "${PWD}/**"
+
+  # Denied patterns (always blocked)
+  denied:
+    # Credentials
+    - "**/.env"
+    - "**/.env.*"
+    - "**/credentials*"
+    - "**/secrets/**"
+
+    # Keys
+    - "**/*.pem"
+    - "**/*.key"
+    - "**/*.p12"
+    - "**/id_rsa*"
+    - "**/id_ed25519*"
+
+    # System
+    - "/etc/**"
+    - "/var/**"
+    - "~/.ssh/**"
+    - "~/.aws/**"
+    - "~/.gnupg/**"
+```
+
+**Verification:**
+```bash
+# Test sandbox enforcement
+./ossasai-audit.sh --check TB-01
+
+# Manual test - should fail
+ai-assistant "Read /etc/passwd"
+# Expected: Access denied
+```
+
+### Step 3: Command Restrictions (TB-02)
+
+Configure command allowlist:
+
+```yaml
+# Command execution
+commands:
+  mode: "allowlist"
+  require_approval: true
+  approval_timeout_seconds: 30
+
+  # Allowed commands
+  allowlist:
+    # Version control
+    - command: "git"
+      args_allowed: ["status", "diff", "log", "add", "commit", "push", "pull", "checkout", "branch", "merge", "rebase", "stash"]
+
+    # Node.js
+    - command: "npm"
+      args_allowed: ["install", "test", "build", "run", "ci", "audit"]
+    - command: "npx"
+      args_allowed: ["*"]
+    - command: "node"
+      sandbox_required: true
+
+    # Python
+    - command: "python"
+      sandbox_required: true
+    - command: "python3"
+      sandbox_required: true
+    - command: "pip"
+      args_allowed: ["install", "list", "freeze"]
+
+    # Build tools
+    - command: "make"
+    - command: "cargo"
+    - command: "go"
+
+    # File operations (sandboxed)
+    - command: "cat"
+      sandbox_required: true
+    - command: "ls"
+      sandbox_required: true
+    - command: "mkdir"
+      sandbox_required: true
+    - command: "cp"
+      sandbox_required: true
+    - command: "mv"
+      sandbox_required: true
+
+  # Explicit denials
+  denylist:
+    - "rm -rf /"
+    - "rm -rf ~"
+    - "sudo *"
+    - "curl * | *sh"
+    - "wget * | *sh"
+    - "chmod 777 *"
+```
+
+**Verification:**
+```bash
+./ossasai-audit.sh --check TB-02
+
+# Test denial
+ai-assistant "Run: sudo rm -rf /"
+# Expected: Command denied
+```
+
+### Step 4: Authentication (ID-01)
+
+Bind to local user:
+
+```yaml
+# Authentication
+authentication:
+  required: true
+  method: "os_user"
+
+  os_user:
+    bind_to_euid: true
+    allowed_users:
+      - "${USER}"
+    deny_root: true
+    deny_system_accounts: true
+```
+
+**Verification:**
+```bash
+./ossasai-audit.sh --check ID-01
+
+# Test root denial
+sudo ai-assistant "hello"
+# Expected: Root execution not allowed
+```
+
+### Step 5: Working Directory Isolation (LS-01)
+
+```yaml
+# Working directory
+workspace:
+  root: "${PWD}"
+  strict_isolation: true
+
+  # Context tracking
+  context:
+    track_changes: true
+    max_depth: 20
+    restore_on_error: true
+```
+
+### Step 6: Sensitive File Protection (LS-02)
+
+```yaml
+# Sensitive file detection
+sensitive_files:
+  detection:
+    enabled: true
+    block_access: true
+    redact_output: true
+
+  patterns:
+    # Path patterns
+    paths:
+      - "**/.env*"
+      - "**/credentials*"
+      - "**/*.pem"
+      - "**/*.key"
+
+    # Content patterns
+    content:
+      - pattern: "(?i)api[_-]?key.*=.*[A-Za-z0-9]{20,}"
+        type: "api_key"
+      - pattern: "-----BEGIN.*PRIVATE KEY-----"
+        type: "private_key"
+      - pattern: "ghp_[A-Za-z0-9]{36}"
+        type: "github_token"
+```
+
+### Step 7: Logging
+
+```yaml
+# Audit logging
+logging:
+  enabled: true
+  level: "info"
+
+  # Log location
+  path: "~/.local/share/ocsas/logs"
+  rotation:
+    max_size_mb: 10
+    max_files: 5
+
+  # Security events
+  security:
+    log_access_denied: true
+    log_commands: true
+    log_file_access: true
+```
+
+## Complete L1 Configuration
+
+<Accordion title="Full L1 Configuration File">
+```yaml
+# ~/.config/ocsas/config.yaml
+# OSSASAI L1 (Local-First) Configuration
+
+version: "1.0"
+assurance_level: "L1"
+
+# Authentication (ID-01)
+authentication:
+  required: true
+  method: "os_user"
+  os_user:
+    bind_to_euid: true
+    allowed_users: ["${USER}"]
+    deny_root: true
+
+# Filesystem (TB-01, LS-01)
+filesystem:
+  scope: "workdir"
+  root: "${PWD}"
+  follow_symlinks: false
+  allowed:
+    - "${PWD}/**"
+  denied:
+    - "**/.env*"
+    - "**/credentials*"
+    - "**/secrets/**"
+    - "**/*.pem"
+    - "**/*.key"
+    - "~/.ssh/**"
+    - "~/.aws/**"
+
+# Commands (TB-02)
+commands:
+  mode: "allowlist"
+  require_approval: true
+  allowlist:
+    - command: "git"
+    - command: "npm"
+    - command: "python"
+    - command: "make"
+    - command: "ls"
+    - command: "cat"
+  denylist:
+    - "rm -rf /"
+    - "sudo *"
+    - "curl * | *sh"
+
+# Sensitive Files (LS-02)
+sensitive_files:
+  detection:
+    enabled: true
+    block_access: true
+
+# Logging
+logging:
+  enabled: true
+  level: "info"
+  security:
+    log_access_denied: true
+    log_commands: true
+
+# Plugin Verification (SC-01 - SHOULD for L1)
+plugins:
+  verification:
+    enabled: true
+    level: "basic"  # SHOULD, not MUST for L1
+```
+</Accordion>
+
+## Validation
+
+Run the complete L1 audit:
+
+```bash
+# Full L1 compliance check
+./ossasai-audit.sh --level L1 --verbose
+
+# Expected output:
+# CP-01: PASS - Secure defaults configured
+# CP-02: PASS - Permission model enforced
+# ID-01: PASS - Authentication required
+# TB-01: PASS - Filesystem sandboxed
+# TB-02: PASS - Commands restricted
+# LS-01: PASS - Working directory isolated
+# LS-02: PASS - Sensitive files protected
+#
+# L1 Compliance: PASS (7/7 required controls)
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Sandbox too restrictive">
+    If legitimate operations are blocked:
+    1. Check the specific file path being accessed
+    2. Verify it's within the working directory
+    3. Ensure it doesn't match denied patterns
+    4. Add explicit allow rule if needed
+
+    ```yaml
+    filesystem:
+      allowed:
+        - "${PWD}/**"
+        - "${PWD}/node_modules/.bin/**"  # Add specific path
+    ```
+  </Accordion>
+
+  <Accordion title="Commands being denied">
+    If a needed command is blocked:
+    1. Verify command is in allowlist
+    2. Check argument patterns
+    3. Add command with appropriate restrictions
+
+    ```yaml
+    commands:
+      allowlist:
+        - command: "new-tool"
+          args_allowed: ["safe-arg1", "safe-arg2"]
+    ```
+  </Accordion>
+
+  <Accordion title="Authentication failures">
+    If authentication fails:
+    1. Verify current user matches allowed users
+    2. Check if running as root (denied by default)
+    3. Verify os_user binding configuration
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+After completing L1 deployment:
+
+1. **Monitor**: Review logs for blocked operations to identify policy gaps
+2. **Tune**: Adjust allowlists based on actual usage
+3. **Upgrade**: Consider [L2 deployment](/implementation/l2-deployment) for network features

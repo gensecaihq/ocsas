@@ -1,0 +1,438 @@
+---
+title: 'CI/CD Integration'
+description: 'DevSecOps integration for automated compliance verification'
+---
+
+## Overview
+
+Integrate OSSASAI compliance verification into your CI/CD pipeline to catch security regressions early and maintain continuous compliance.
+
+## GitHub Actions
+
+### Basic Compliance Check
+
+```yaml
+# .github/workflows/ocsas-compliance.yml
+name: OSSASAI Compliance
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly
+
+jobs:
+  compliance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download OSSASAI Audit
+        run: |
+          curl -sSL https://ocsas.dev/audit.sh -o ossasai-audit.sh
+          chmod +x ossasai-audit.sh
+
+      - name: Run Compliance Check
+        run: |
+          ./ossasai-audit.sh --level L2 --output-format json > report.json
+
+      - name: Check Results
+        run: |
+          compliance=$(jq '.summary.compliance_percentage' report.json)
+          echo "Compliance: ${compliance}%"
+          if (( $(echo "$compliance < 100" | bc -l) )); then
+            echo "::error::Compliance check failed"
+            jq '.controls[] | select(.status == "FAIL")' report.json
+            exit 1
+          fi
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ocsas-compliance-report
+          path: report.json
+```
+
+### Full Security Pipeline
+
+```yaml
+# .github/workflows/security-pipeline.yml
+name: Security Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ocsas-compliance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: OSSASAI Audit
+        run: |
+          curl -sSL https://ocsas.dev/audit.sh | bash -s -- --level L2
+
+  dependency-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate SBOM
+        run: |
+          ./ossasai-audit.sh --generate-sbom > sbom.json
+
+      - name: Vulnerability Scan
+        run: |
+          ./ossasai-audit.sh --scan-vulnerabilities sbom.json
+
+  config-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Configuration
+        run: |
+          ./ossasai-audit.sh --validate-config config.yaml
+
+  policy-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Policy Tests
+        run: |
+          ./ossasai-audit.sh --test-policies
+
+  report:
+    needs: [ocsas-compliance, dependency-scan, config-validation, policy-tests]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Generate Summary Report
+        run: |
+          echo "## Security Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+```
+
+### PR Security Check
+
+```yaml
+# .github/workflows/pr-security.yml
+name: PR Security Check
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  security-review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Config Changes
+        id: config-check
+        run: |
+          # Check if security config changed
+          if git diff --name-only origin/main | grep -E 'config.*\.ya?ml|permissions\.ya?ml'; then
+            echo "config_changed=true" >> $GITHUB_OUTPUT
+            echo "::warning::Security configuration changed - requires review"
+          fi
+
+      - name: OSSASAI Diff Audit
+        run: |
+          ./ossasai-audit.sh --level L2 --diff origin/main
+
+      - name: Comment on PR
+        if: steps.config-check.outputs.config_changed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '⚠️ **Security Configuration Changed**\n\nThis PR modifies security configuration. Please ensure changes are reviewed by the security team.'
+            })
+```
+
+---
+
+## GitLab CI
+
+```yaml
+# .gitlab-ci.yml
+stages:
+  - security
+  - test
+  - deploy
+
+variables:
+  OSSASAI_LEVEL: "L2"
+
+ocsas-compliance:
+  stage: security
+  image: ubuntu:22.04
+  before_script:
+    - apt-get update && apt-get install -y curl jq
+    - curl -sSL https://ocsas.dev/audit.sh -o ossasai-audit.sh
+    - chmod +x ossasai-audit.sh
+  script:
+    - ./ossasai-audit.sh --level $OSSASAI_LEVEL --output-format json > report.json
+    - |
+      compliance=$(jq '.summary.compliance_percentage' report.json)
+      if [ $(echo "$compliance < 100" | bc) -eq 1 ]; then
+        echo "Compliance failed: ${compliance}%"
+        exit 1
+      fi
+  artifacts:
+    paths:
+      - report.json
+    reports:
+      junit: report.xml
+
+dependency-scan:
+  stage: security
+  script:
+    - ./ossasai-audit.sh --generate-sbom > sbom.json
+    - ./ossasai-audit.sh --scan-vulnerabilities sbom.json
+  artifacts:
+    paths:
+      - sbom.json
+
+policy-validation:
+  stage: security
+  script:
+    - ./ossasai-audit.sh --validate-policies
+    - ./ossasai-audit.sh --test-policies
+  only:
+    changes:
+      - policies/**/*
+
+scheduled-audit:
+  stage: security
+  script:
+    - ./ossasai-audit.sh --level L2 --full
+  only:
+    - schedules
+```
+
+---
+
+## Jenkins
+
+```groovy
+// Jenkinsfile
+pipeline {
+    agent any
+
+    environment {
+        OSSASAI_LEVEL = 'L2'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('OSSASAI Compliance') {
+            steps {
+                sh '''
+                    curl -sSL https://ocsas.dev/audit.sh -o ossasai-audit.sh
+                    chmod +x ossasai-audit.sh
+                    ./ossasai-audit.sh --level ${OSSASAI_LEVEL} --output-format json > report.json
+                '''
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'report.json'
+                }
+            }
+        }
+
+        stage('Dependency Scan') {
+            steps {
+                sh '''
+                    ./ossasai-audit.sh --generate-sbom > sbom.json
+                    ./ossasai-audit.sh --scan-vulnerabilities sbom.json
+                '''
+            }
+        }
+
+        stage('Policy Validation') {
+            when {
+                changeset "policies/**"
+            }
+            steps {
+                sh './ossasai-audit.sh --validate-policies'
+            }
+        }
+    }
+
+    post {
+        failure {
+            emailext (
+                subject: "OSSASAI Compliance Failed: ${env.JOB_NAME}",
+                body: "Compliance check failed. See ${env.BUILD_URL}",
+                to: 'security@example.com'
+            )
+        }
+    }
+}
+```
+
+---
+
+## Pre-commit Hooks
+
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: local
+    hooks:
+      - id: ocsas-config-check
+        name: OSSASAI Config Validation
+        entry: ./ossasai-audit.sh --validate-config
+        language: script
+        files: 'config.*\.ya?ml$'
+        pass_filenames: false
+
+      - id: ocsas-secrets-check
+        name: OSSASAI Secrets Detection
+        entry: ./ossasai-audit.sh --scan-secrets
+        language: script
+        pass_filenames: false
+
+      - id: ocsas-policy-check
+        name: OSSASAI Policy Validation
+        entry: ./ossasai-audit.sh --validate-policies
+        language: script
+        files: 'policies/.*'
+        pass_filenames: false
+```
+
+---
+
+## Compliance Dashboard
+
+### Metrics Collection
+
+```yaml
+# prometheus-metrics.yaml
+# OSSASAI metrics for monitoring
+metrics:
+  - name: ocsas_compliance_percentage
+    type: gauge
+    help: "OSSASAI compliance percentage"
+    labels:
+      - level
+      - environment
+
+  - name: ocsas_control_status
+    type: gauge
+    help: "OSSASAI control status (1=pass, 0=fail)"
+    labels:
+      - control_id
+      - level
+
+  - name: ocsas_audit_duration_seconds
+    type: histogram
+    help: "OSSASAI audit duration"
+
+  - name: ocsas_vulnerabilities_total
+    type: gauge
+    help: "Total vulnerabilities by severity"
+    labels:
+      - severity
+```
+
+### Grafana Dashboard
+
+```json
+{
+  "dashboard": {
+    "title": "OSSASAI Compliance Dashboard",
+    "panels": [
+      {
+        "title": "Compliance Score",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "ocsas_compliance_percentage{environment=\"production\"}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 80, "color": "yellow"},
+                {"value": 100, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "title": "Control Status",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "ocsas_control_status"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Automated Remediation
+
+```yaml
+# .github/workflows/auto-remediation.yml
+name: Auto Remediation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+
+jobs:
+  auto-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Audit
+        run: |
+          ./ossasai-audit.sh --level L2 --output-format json > report.json
+
+      - name: Auto-Fix Configuration
+        run: |
+          # Auto-fix common issues
+          ./ossasai-audit.sh --auto-fix --dry-run
+
+      - name: Create PR if Changes
+        uses: peter-evans/create-pull-request@v5
+        with:
+          title: "chore: Auto-fix OSSASAI compliance issues"
+          body: "Automated fixes for OSSASAI compliance issues"
+          branch: auto-fix/ocsas-compliance
+```

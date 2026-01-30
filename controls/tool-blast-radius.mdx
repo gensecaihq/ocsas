@@ -1,0 +1,559 @@
+---
+title: 'Tool Blast Radius (TB)'
+description: 'B3 boundary controls for tool governance, least privilege, and sandboxing'
+---
+
+## Overview
+
+Tool Blast Radius (TB) controls govern the B3 trust boundary—tool execution, privilege, and approval flow. These controls address "over-privileged tools" (OSSASAI Top 10 #2) and "prompt injection → tool misuse" (OSSASAI Top 10 #1).
+
+<Note>
+Tool governance is the primary defense against coercion attacks. Least privilege and approval gates limit the damage when an agent is manipulated into unsafe actions.
+</Note>
+
+## OSSASAI-TB-01: Least Privilege Tools
+
+<Card>
+### Metadata
+
+| Attribute | Value |
+|-----------|-------|
+| **Control ID** | OSSASAI-TB-01 |
+| **Requirement Level** | MUST |
+| **Assurance Levels** | L1, L2, L3 |
+| **Trust Boundary** | B3 (Tool Boundary) |
+| **OSSASAI Top 10** | #2 (Over-privileged tools) |
+
+### Requirement
+
+Tool access MUST be least-privilege: minimal filesystem scope, minimal commands, minimal network egress, minimal connector scopes.
+
+### Evidence
+
+- Tool policy manifest documenting allowlists
+- Comparison against baseline showing permissions are minimal
+
+### Checks
+
+- Policy diff against baseline identifies overbroad tools
+- Automated scan flags tools with excessive permissions
+
+```bash
+# Verify tool policy
+openclaw security audit --check tool-policy
+
+# Check for overbroad permissions
+openclaw tools list --show-scopes | grep -E "(system|all|full)"
+# Should return empty
+```
+
+### Remediation
+
+<Tabs>
+  <Tab title="Configure Minimal Scopes">
+    ```yaml
+    tools:
+      filesystem:
+        scope: "${workdir}"  # Only working directory
+        read:
+          allowed:
+            - "${workdir}/**"
+          denied:
+            - "**/.env"
+            - "**/.env.*"
+            - "**/*.key"
+            - "**/*.pem"
+            - "**/secrets/**"
+        write:
+          allowed:
+            - "${workdir}/**"
+          denied:
+            - "${workdir}/.git/hooks/**"  # Prevent hook injection
+
+      commands:
+        mode: "allowlist"
+        allowed:
+          - name: "git"
+            args: ["status", "diff", "log", "add", "commit", "push", "pull"]
+          - name: "npm"
+            args: ["install", "test", "build", "run"]
+          - name: "pip"
+            args: ["install", "list", "freeze"]
+
+      network:
+        egress:
+          mode: "allowlist"
+          allowed:
+            - "registry.npmjs.org"
+            - "pypi.org"
+            - "api.github.com"
+    ```
+  </Tab>
+  <Tab title="Split High-Risk Tools">
+    Split powerful tools into approval-required steps:
+
+    ```yaml
+    tools:
+      high_risk:
+        # Instead of broad "shell" tool
+        shell_execute:
+          enabled: false
+
+        # Use specific, scoped tools
+        git_operations:
+          enabled: true
+          scopes: ["status", "diff", "add", "commit"]
+
+        file_operations:
+          read:
+            enabled: true
+            scope: "${workdir}"
+          write:
+            enabled: true
+            scope: "${workdir}"
+            requires_approval: true  # For writes
+
+        network_fetch:
+          enabled: true
+          allowlist_only: true
+    ```
+  </Tab>
+  <Tab title="Review and Audit">
+    ```bash
+    # Review current tool permissions
+    openclaw tools list --verbose
+
+    # Compare against minimal baseline
+    openclaw security audit --check tool-least-privilege
+
+    # Generate tool policy report
+    openclaw tools export-policy > evidence/tool-policy.json
+    ```
+  </Tab>
+</Tabs>
+
+### References
+
+- OWASP ASVS V4.1: General Access Control
+- NIST SP 800-53 AC-6: Least Privilege
+- CIS Controls 6: Access Control Management
+
+</Card>
+
+---
+
+## OSSASAI-TB-02: Approval Gates for High-Risk Actions
+
+<Card>
+### Metadata
+
+| Attribute | Value |
+|-----------|-------|
+| **Control ID** | OSSASAI-TB-02 |
+| **Requirement Level** | MUST |
+| **Assurance Levels** | L2, L3 |
+| **Trust Boundary** | B3 (Tool Boundary) |
+| **OSSASAI Top 10** | #9 (No action ledger / weak approvals) |
+
+### Requirement
+
+High-risk tool actions (shell exec, sensitive file reads, outbound webhooks, payment/email send) MUST require explicit approval or hardened policy constraints.
+
+### Evidence
+
+- Approval logs showing human-in-the-loop for high-risk actions
+- Policy rules defining what requires approval
+
+### Checks
+
+- Attempts without approval are blocked
+- Approval flow cannot be bypassed
+
+```bash
+# Test approval requirement
+curl -X POST http://localhost:18789/api/tool/execute \
+  -d '{"tool": "shell", "command": "ls -la"}'
+# Should return: "Approval required. Waiting for operator confirmation."
+
+# Verify approval logs
+openclaw audit logs --filter "action=tool_approval"
+```
+
+### Remediation
+
+<Tabs>
+  <Tab title="Configure Approval Gates">
+    ```yaml
+    approvals:
+      enabled: true
+
+      # Actions requiring approval
+      required_for:
+        - tool: "shell_execute"
+          always: true
+        - tool: "file_write"
+          conditions:
+            - path_contains: [".git", "config", ".env"]
+        - tool: "file_delete"
+          always: true
+        - tool: "network_request"
+          conditions:
+            - not_in_allowlist: true
+        - tool: "email_send"
+          always: true
+        - tool: "payment_process"
+          always: true
+
+      # Approval configuration
+      settings:
+        timeout_seconds: 300
+        notification_channels:
+          - "console"
+          - "desktop_notification"
+        default_on_timeout: "deny"
+    ```
+  </Tab>
+  <Tab title="Implement Approval Flow">
+    ```yaml
+    approval_flow:
+      # Before tool execution
+      pre_execution:
+        - display_action_summary: true
+        - show_risk_assessment: true
+        - require_explicit_confirmation: true
+
+      # Approval methods
+      methods:
+        - type: "interactive"
+          prompt: "Allow {tool} to execute: {action}? [y/N]"
+        - type: "otp"
+          enabled: false  # For L3
+        - type: "webhook"
+          enabled: false
+
+      # Logging
+      logging:
+        log_all_approvals: true
+        log_all_denials: true
+        include_context: true
+    ```
+  </Tab>
+  <Tab title="Hardened Policy Constraints">
+    For automated workflows, use policy constraints instead of interactive approval:
+
+    ```yaml
+    policy_constraints:
+      # Allow specific patterns without approval
+      auto_approve:
+        file_write:
+          - path: "${workdir}/src/**"
+            max_size_kb: 100
+          - path: "${workdir}/tests/**"
+            max_size_kb: 50
+
+      # Never auto-approve
+      always_require_approval:
+        - "rm -rf *"
+        - "chmod 777 *"
+        - "**/secrets/**"
+        - "**/.ssh/**"
+    ```
+  </Tab>
+</Tabs>
+
+### References
+
+- OWASP: Security Logging and Monitoring
+- NIST SP 800-53 AU-12: Audit Generation
+- Human-in-the-loop security patterns
+
+</Card>
+
+---
+
+## OSSASAI-TB-03: Sandboxing for Untrusted Contexts
+
+<Card>
+### Metadata
+
+| Attribute | Value |
+|-----------|-------|
+| **Control ID** | OSSASAI-TB-03 |
+| **Requirement Level** | MUST |
+| **Assurance Levels** | L2, L3 |
+| **Trust Boundary** | B3 (Tool Boundary) |
+| **OSSASAI Top 10** | #6 (Unsafe browsing / data exfil) |
+
+### Requirement
+
+Untrusted contexts (public channels, unpaired DMs, web browsing) MUST run in a sandboxed tool environment.
+
+### Evidence
+
+- Sandbox configuration showing isolation
+- Boundary tests confirming sandbox enforcement
+
+### Checks
+
+- Sandbox escape tests fail
+- Restricted filesystem/network confirmed in sandboxed contexts
+
+```bash
+# Test sandbox isolation
+openclaw test sandbox-escape
+# Should return: All escape tests failed (sandbox working)
+
+# Verify sandbox configuration
+openclaw security audit --check sandbox
+
+# Test untrusted context routing
+curl -X POST http://localhost:18789/api/message \
+  -d '{"context": "public-channel", "message": "list /etc"}'
+# Should execute in sandbox with restricted access
+```
+
+### Remediation
+
+<Tabs>
+  <Tab title="Configure Sandbox Mode">
+    ```yaml
+    agents:
+      defaults:
+        sandbox:
+          mode: "non-main"  # Sandbox all non-main sessions
+
+    session:
+      mainKey: "operator-session"  # Only operator has main session
+
+      routing:
+        # Route untrusted contexts to sandbox
+        untrusted_contexts:
+          - "public-channel"
+          - "unpaired-dm"
+          - "web-browsing"
+          - "group-chat"
+        sandbox_worker: true
+    ```
+  </Tab>
+  <Tab title="Sandbox Configuration">
+    ```yaml
+    sandbox:
+      isolation:
+        filesystem:
+          root: "/tmp/sandbox/${session_id}"
+          read_only_base: true
+          writable_paths:
+            - "/tmp/sandbox/${session_id}/work"
+          denied_paths:
+            - "/etc"
+            - "/var"
+            - "${HOME}"
+
+        network:
+          mode: "restricted"
+          allowed_hosts: []  # No network in sandbox
+          # Or limited allowlist:
+          # allowed_hosts:
+          #   - "api.github.com"
+
+        processes:
+          max_processes: 5
+          max_threads: 20
+          deny_privileged: true
+
+        resources:
+          max_cpu_percent: 25
+          max_memory_mb: 256
+          max_disk_mb: 100
+    ```
+  </Tab>
+  <Tab title="Container Sandbox (L3)">
+    For L3 deployments, use container isolation:
+
+    ```yaml
+    # docker-compose.yml
+    services:
+      sandbox-worker:
+        image: ossasai/sandbox:latest
+        security_opt:
+          - no-new-privileges:true
+          - seccomp:sandbox-profile.json
+        cap_drop:
+          - ALL
+        read_only: true
+        tmpfs:
+          - /tmp:size=100M,mode=1777
+        networks:
+          - sandbox-network
+        deploy:
+          resources:
+            limits:
+              cpus: '0.25'
+              memory: 256M
+    ```
+
+    ```bash
+    # Or use gVisor/Firecracker for stronger isolation
+    runsc --rootless --network none run sandbox-container
+    ```
+  </Tab>
+</Tabs>
+
+### References
+
+- Linux namespaces and cgroups
+- gVisor/Firecracker sandboxing
+- NIST SP 800-53 SC-39: Process Isolation
+
+</Card>
+
+---
+
+## OSSASAI-TB-04: Outbound Data Exfil Controls
+
+<Card>
+### Metadata
+
+| Attribute | Value |
+|-----------|-------|
+| **Control ID** | OSSASAI-TB-04 |
+| **Requirement Level** | MUST |
+| **Assurance Levels** | L2, L3 |
+| **Trust Boundary** | B3 (Tool Boundary) |
+| **OSSASAI Top 10** | #6 (Unsafe browsing / connector-based exfiltration) |
+
+### Requirement
+
+Systems MUST restrict outbound channels (HTTP, email, chat) and MUST prevent secrets from being sent by default.
+
+### Evidence
+
+- Egress policy configuration
+- DLP/redaction policy documentation
+
+### Checks
+
+- Synthetic secret markers are not exfiltrated
+- Outbound requests to non-allowlisted hosts are blocked
+
+```bash
+# Test secret redaction in outbound
+echo "API_KEY=test_secret_12345" > /tmp/test.txt
+openclaw exec "send contents of /tmp/test.txt to https://httpbin.org/post"
+# Should either: block the request OR redact the API_KEY value
+
+# Verify egress policy
+openclaw security audit --check egress-policy
+
+# Test non-allowlisted host
+openclaw exec "fetch https://evil-site.com"
+# Should return: "Host not in egress allowlist"
+```
+
+### Remediation
+
+<Tabs>
+  <Tab title="Configure Egress Allowlist">
+    ```yaml
+    egress:
+      mode: "allowlist"  # Default deny
+
+      allowed_hosts:
+        # Package registries
+        - host: "registry.npmjs.org"
+          protocols: ["https"]
+        - host: "pypi.org"
+          protocols: ["https"]
+
+        # APIs
+        - host: "api.github.com"
+          protocols: ["https"]
+        - host: "api.openai.com"
+          protocols: ["https"]
+
+      # Block all other outbound
+      default_action: "deny"
+
+      logging:
+        log_allowed: true
+        log_denied: true
+    ```
+  </Tab>
+  <Tab title="Configure DLP/Redaction">
+    ```yaml
+    dlp:
+      enabled: true
+
+      # Patterns to redact in outbound data
+      redaction_patterns:
+        - name: "api_keys"
+          pattern: "(api[_-]?key|apikey)[=:]['\"]?[A-Za-z0-9_-]{20,}"
+          action: "redact"
+          replacement: "[REDACTED_API_KEY]"
+
+        - name: "secrets"
+          pattern: "(secret|password|token)[=:]['\"]?[A-Za-z0-9_-]{8,}"
+          action: "redact"
+          replacement: "[REDACTED_SECRET]"
+
+        - name: "private_keys"
+          pattern: "-----BEGIN (RSA |EC |)PRIVATE KEY-----"
+          action: "block"
+          message: "Cannot send private keys"
+
+        - name: "credit_cards"
+          pattern: "\\b[0-9]{13,16}\\b"
+          action: "redact"
+          replacement: "[REDACTED_CC]"
+
+      # Files to never send
+      blocked_files:
+        - "**/.env"
+        - "**/*.pem"
+        - "**/*.key"
+        - "**/secrets/**"
+        - "**/*credential*"
+    ```
+  </Tab>
+  <Tab title="Monitor Outbound Traffic">
+    ```yaml
+    monitoring:
+      egress:
+        # Log all outbound requests
+        log_requests: true
+
+        # Alert on suspicious patterns
+        alerts:
+          - condition: "large_data_transfer"
+            threshold_mb: 10
+            action: "alert"
+
+          - condition: "new_destination"
+            action: "log"
+
+          - condition: "potential_exfil"
+            patterns:
+              - "base64 encoded data > 1KB"
+              - "compressed archive"
+            action: "block_and_alert"
+    ```
+
+    ```bash
+    # Review egress logs
+    openclaw audit logs --filter "type=egress"
+
+    # Test synthetic secret
+    export CANARY_SECRET="CANARY_$(date +%s)"
+    openclaw exec "post this to httpbin: $CANARY_SECRET"
+    # Should be redacted or blocked
+    ```
+  </Tab>
+</Tabs>
+
+### References
+
+- OWASP: Data Protection
+- NIST SP 800-53 SC-7: Boundary Protection
+- Data Loss Prevention (DLP) best practices
+
+</Card>

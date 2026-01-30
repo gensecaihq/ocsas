@@ -1,0 +1,374 @@
+---
+title: 'Adversary Classes'
+description: 'A1-A5 adversary taxonomy with capabilities and motivations'
+---
+
+## Overview
+
+OSSASAI defines five adversary classes representing threat actors with increasing capabilities. Understanding adversary profiles helps organizations prioritize controls based on realistic threat scenarios.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Adversary Capability Spectrum                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  A1 ▓░░░░░░░░░░░░░░░░░░░  Script Kiddie                             │
+│  A2 ▓▓▓▓▓░░░░░░░░░░░░░░░  Motivated Individual                      │
+│  A3 ▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░  Organized Crime                           │
+│  A4 ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  Nation State                              │
+│  A5 ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░  Insider (Variable)                        │
+│                                                                      │
+│     Low ◄──────────────────────────────────► High                   │
+│                    Capability                                        │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+## A1: Script Kiddie
+
+### Profile
+
+| Attribute | Value |
+|-----------|-------|
+| **Capability** | Low |
+| **Resources** | Minimal |
+| **Persistence** | Low |
+| **Sophistication** | Uses pre-built tools |
+| **Primary Motivation** | Curiosity, notoriety |
+
+### Characteristics
+
+<AccordionGroup>
+  <Accordion title="Technical Capabilities" icon="wrench">
+    - Uses publicly available exploit tools
+    - Limited understanding of underlying techniques
+    - Relies on automated scanning and exploitation
+    - Cannot develop custom attacks
+    - Limited ability to evade detection
+  </Accordion>
+
+  <Accordion title="Attack Patterns" icon="route">
+    - Mass scanning for known vulnerabilities
+    - Default credential attempts
+    - Copy-paste prompt injections from public sources
+    - Opportunistic targeting
+  </Accordion>
+
+  <Accordion title="Typical Targets" icon="crosshairs">
+    - Unpatched systems
+    - Default configurations
+    - Publicly exposed services
+    - Systems with known vulnerabilities
+  </Accordion>
+</AccordionGroup>
+
+### Relevant AATT Threats
+
+| Threat ID | Threat Name | Likelihood |
+|-----------|-------------|------------|
+| AATT-C1 | Basic Prompt Injection | High |
+| AATT-D1 | Resource Exhaustion | Medium |
+| AATT-E3 | Credential Exposure (opportunistic) | Medium |
+
+### Defensive Focus
+
+- **L1 controls are sufficient** for most A1 threats
+- Secure defaults prevent opportunistic exploitation
+- Basic input validation stops copy-paste attacks
+
+---
+
+## A2: Motivated Individual
+
+### Profile
+
+| Attribute | Value |
+|-----------|-------|
+| **Capability** | Medium |
+| **Resources** | Limited personal resources |
+| **Persistence** | Moderate |
+| **Sophistication** | Can adapt techniques |
+| **Primary Motivation** | Financial gain, revenge, ideology |
+
+### Characteristics
+
+<AccordionGroup>
+  <Accordion title="Technical Capabilities" icon="wrench">
+    - Understands attack techniques conceptually
+    - Can modify existing exploits
+    - Capable of targeted social engineering
+    - Basic operational security awareness
+    - Can chain multiple vulnerabilities
+  </Accordion>
+
+  <Accordion title="Attack Patterns" icon="route">
+    - Targeted prompt injection attacks
+    - Social engineering to obtain access
+    - Credential stuffing and password attacks
+    - Malicious plugin development
+    - Persistence through configuration changes
+  </Accordion>
+
+  <Accordion title="Typical Targets" icon="crosshairs">
+    - Specific individuals or organizations
+    - Competitors or former employers
+    - Systems with valuable data
+    - Cryptocurrency-related applications
+  </Accordion>
+</AccordionGroup>
+
+### Relevant AATT Threats
+
+| Threat ID | Threat Name | Likelihood |
+|-----------|-------------|------------|
+| AATT-C1 | Targeted Prompt Injection | High |
+| AATT-C2 | Social Engineering | High |
+| AATT-C3 | Context Manipulation | Medium |
+| AATT-E1 | Data Exfiltration | Medium |
+| AATT-E4 | Tool Abuse | Medium |
+| AATT-S1 | Malicious Plugin | Medium |
+
+### Defensive Focus
+
+- **L2 controls recommended** for A2 threat protection
+- Session isolation prevents cross-contamination
+- Supply chain controls detect malicious plugins
+- Audit logging enables incident investigation
+
+---
+
+## A3: Organized Crime
+
+### Profile
+
+| Attribute | Value |
+|-----------|-------|
+| **Capability** | High |
+| **Resources** | Significant financial backing |
+| **Persistence** | High |
+| **Sophistication** | Professional operations |
+| **Primary Motivation** | Financial gain, ransomware, data theft |
+
+### Characteristics
+
+<AccordionGroup>
+  <Accordion title="Technical Capabilities" icon="wrench">
+    - Professional malware development
+    - Exploit research and development
+    - Infrastructure for large-scale attacks
+    - Money laundering capabilities
+    - Affiliate and RaaS models
+  </Accordion>
+
+  <Accordion title="Attack Patterns" icon="route">
+    - Supply chain compromise at scale
+    - Advanced persistent threats (APT-lite)
+    - Ransomware deployment
+    - Cryptomining operations
+    - Credential marketplace operations
+  </Accordion>
+
+  <Accordion title="Typical Targets" icon="crosshairs">
+    - Organizations with valuable IP
+    - Financial institutions
+    - Healthcare providers
+    - Critical infrastructure
+    - Software supply chains
+  </Accordion>
+</AccordionGroup>
+
+### Relevant AATT Threats
+
+| Threat ID | Threat Name | Likelihood |
+|-----------|-------------|------------|
+| AATT-C1 | Sophisticated Prompt Injection | High |
+| AATT-S1 | Supply Chain Trojan | High |
+| AATT-S2 | Dependency Confusion | High |
+| AATT-E1 | Large-scale Data Exfiltration | High |
+| AATT-E5 | Sandbox Escape | Medium |
+| AATT-E6 | Capability Escalation | Medium |
+
+### Defensive Focus
+
+- **L2 controls required**, L3 recommended
+- Rigorous supply chain verification essential
+- Network monitoring for C2 detection
+- Incident response preparation critical
+
+---
+
+## A4: Nation State
+
+### Profile
+
+| Attribute | Value |
+|-----------|-------|
+| **Capability** | Very High |
+| **Resources** | Unlimited (state backing) |
+| **Persistence** | Very High |
+| **Sophistication** | Elite technical capabilities |
+| **Primary Motivation** | Espionage, sabotage, influence |
+
+### Characteristics
+
+<AccordionGroup>
+  <Accordion title="Technical Capabilities" icon="wrench">
+    - Zero-day exploit development
+    - Custom malware frameworks
+    - Hardware implant capabilities
+    - SIGINT integration
+    - Years-long operation timelines
+    - Ability to compromise any software supply chain
+  </Accordion>
+
+  <Accordion title="Attack Patterns" icon="route">
+    - Long-term strategic compromise
+    - Supply chain infiltration
+    - Trusted insider recruitment
+    - Stealthy data exfiltration
+    - Pre-positioned access for future use
+    - Destructive attacks (when authorized)
+  </Accordion>
+
+  <Accordion title="Typical Targets" icon="crosshairs">
+    - Defense contractors
+    - Critical infrastructure
+    - Government agencies
+    - Strategic technology companies
+    - Research institutions
+    - Political organizations
+  </Accordion>
+</AccordionGroup>
+
+### Relevant AATT Threats
+
+| Threat ID | Threat Name | Likelihood |
+|-----------|-------------|------------|
+| AATT-C1-C5 | All Coercion Attacks | High |
+| AATT-S1-S4 | All Supply Chain Attacks | High |
+| AATT-E1-E6 | All Escalation Attacks | High |
+| AATT-P1-P3 | All Persistence Attacks | High |
+
+### Defensive Focus
+
+- **L3 controls required** for nation-state protection
+- Formal verification of critical components
+- Hardware security module integration
+- Comprehensive audit trails
+- Assume breach mentality
+- Regular third-party assessments
+
+<Warning>
+Complete protection against nation-state actors is extremely difficult. L3 controls raise the cost of attack but cannot guarantee prevention. Focus on detection and response capabilities.
+</Warning>
+
+---
+
+## A5: Insider
+
+### Profile
+
+| Attribute | Value |
+|-----------|-------|
+| **Capability** | Variable (based on role) |
+| **Resources** | Legitimate access |
+| **Persistence** | Variable |
+| **Sophistication** | Variable |
+| **Primary Motivation** | Financial, revenge, ideology, coercion |
+
+### Characteristics
+
+<AccordionGroup>
+  <Accordion title="Technical Capabilities" icon="wrench">
+    - Legitimate system access
+    - Knowledge of internal systems
+    - Ability to bypass perimeter controls
+    - Understanding of detection mechanisms
+    - Access to sensitive data
+  </Accordion>
+
+  <Accordion title="Insider Types" icon="users">
+    | Type | Description | Risk Level |
+    |------|-------------|------------|
+    | Negligent | Unintentional security violations | Medium |
+    | Compromised | Credentials stolen by external actor | High |
+    | Malicious | Intentional harmful actions | High |
+    | Third-party | Contractor or vendor with access | Medium-High |
+  </Accordion>
+
+  <Accordion title="Attack Patterns" icon="route">
+    - Data theft using legitimate access
+    - Privilege abuse
+    - Sabotage of systems or data
+    - Installation of backdoors
+    - Credential sharing or selling
+    - Social engineering of colleagues
+  </Accordion>
+</AccordionGroup>
+
+### Relevant AATT Threats
+
+| Threat ID | Threat Name | Likelihood |
+|-----------|-------------|------------|
+| AATT-C4 | History Poisoning | High |
+| AATT-E1 | Data Exfiltration | High |
+| AATT-E4 | Tool Abuse | High |
+| AATT-E6 | Capability Escalation | High |
+| AATT-P1 | Configuration Backdoor | Medium |
+
+### Defensive Focus
+
+- **L2 minimum**, L3 for sensitive environments
+- Principle of least privilege enforcement
+- Session and activity monitoring
+- Behavioral anomaly detection
+- Separation of duties
+- Regular access reviews
+
+---
+
+## Adversary Comparison Matrix
+
+| Attribute | A1 | A2 | A3 | A4 | A5 |
+|-----------|----|----|----|----|-----|
+| Technical Skill | Low | Medium | High | Very High | Variable |
+| Resources | $ | $$ | $$$ | $$$$ | Access |
+| Persistence | Days | Weeks | Months | Years | Variable |
+| Target Selection | Opportunistic | Targeted | Targeted | Strategic | Internal |
+| Detection Difficulty | Easy | Medium | Hard | Very Hard | Hard |
+| Recommended Level | L1 | L2 | L2-L3 | L3 | L2-L3 |
+
+## Mapping Adversaries to Controls
+
+### Control Priority by Adversary
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│              Control Priority by Adversary Class                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Control Domain    │  A1  │  A2  │  A3  │  A4  │  A5  │            │
+│  ──────────────────┼──────┼──────┼──────┼──────┼──────┤            │
+│  Control Plane     │  ●   │  ●●  │  ●●● │  ●●● │  ●●● │            │
+│  Identity/Session  │  ●   │  ●●  │  ●●● │  ●●● │  ●●● │            │
+│  Tool Blast Radius │  ●   │  ●●  │  ●●● │  ●●● │  ●●  │            │
+│  Local State       │  ●   │  ●●  │  ●●  │  ●●● │  ●●● │            │
+│  Supply Chain      │  ○   │  ●   │  ●●● │  ●●● │  ●●  │            │
+│  Formal Verify     │  ○   │  ○   │  ●   │  ●●● │  ●   │            │
+│  Network Security  │  ○   │  ●●  │  ●●● │  ●●● │  ●●  │            │
+│                                                                      │
+│  Legend: ○ = Low priority  ● = Medium  ●● = High  ●●● = Critical   │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Minimum Assurance Level by Risk Profile
+
+| Risk Profile | Primary Adversary Concern | Minimum Level |
+|--------------|--------------------------|---------------|
+| Personal use | A1 | L1 |
+| Small business | A1-A2 | L1-L2 |
+| Enterprise | A2-A3 | L2 |
+| Regulated industry | A3-A4 | L3 |
+| Critical infrastructure | A3-A4 | L3 |
+| Government/Defense | A4 | L3+ |

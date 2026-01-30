@@ -1,0 +1,356 @@
+---
+title: 'Identity & Session (ID)'
+description: 'B1 boundary controls for pairing, verification, and session isolation'
+---
+
+## Overview
+
+Identity & Session (ID) controls govern the B1 trust boundary—inbound identity verification from untrusted senders, channels, and web inputs. These controls address the "session boundary collapse / cross-user leakage" failure mode (OSSASAI Top 10 #4).
+
+<Note>
+The B1 boundary is the primary prompt injection / coercion surface. Session isolation prevents cross-user leakage and instruction carryover.
+</Note>
+
+## OSSASAI-ID-01: Pairing / Verification for New Peers
+
+<Card>
+### Metadata
+
+| Attribute | Value |
+|-----------|-------|
+| **Control ID** | OSSASAI-ID-01 |
+| **Requirement Level** | MUST |
+| **Assurance Levels** | L2, L3 |
+| **Trust Boundary** | B1 (Inbound Identity) |
+| **OSSASAI Top 10** | #1 (Prompt injection → tool misuse) |
+
+### Requirement
+
+Unknown peers MUST require pairing or explicit allowlisting before the agent can execute non-trivial actions in their context.
+
+### Evidence
+
+- Allowlist/pairing policy configuration
+- Approval logs showing peer verification history
+
+### Checks
+
+- Simulated unknown peer cannot trigger tools
+- Pairing flow requires explicit operator approval
+
+```bash
+# Test unknown peer tool access
+curl -X POST http://localhost:18789/api/message \
+  -H "Content-Type: application/json" \
+  -d '{"peer": "unknown@example.com", "message": "run shell: ls -la"}'
+# Should return: "Peer not paired. Approval required."
+
+# Verify pairing required
+openclaw security audit --check peer-pairing
+```
+
+### Remediation
+
+<Tabs>
+  <Tab title="Enable Pairing">
+    ```yaml
+    session:
+      pairingRequired: true
+      pairingMode: "explicit"  # or "first-contact-approval"
+
+      allowlist:
+        enabled: true
+        peers:
+          - "trusted@example.com"
+          - "team@company.com"
+    ```
+  </Tab>
+  <Tab title="Configure Approval Flow">
+    ```yaml
+    pairing:
+      approval:
+        method: "operator"  # Require operator approval
+        timeout: 300        # 5 minutes to approve
+        notification:
+          - "console"
+          - "webhook"
+
+      restrictions:
+        unpaired:
+          allowed_actions:
+            - "read_only"
+            - "conversation"
+          denied_actions:
+            - "shell_execute"
+            - "file_write"
+            - "network_request"
+    ```
+  </Tab>
+  <Tab title="Audit Pairing">
+    ```bash
+    # View paired peers
+    openclaw peers list
+
+    # View pairing history
+    openclaw audit logs --filter "action=peer_paired"
+
+    # Revoke pairing
+    openclaw peers revoke "user@example.com"
+    ```
+  </Tab>
+</Tabs>
+
+### References
+
+- OWASP ASVS V4.1.4: Account Provisioning
+- NIST SP 800-53 AC-2: Account Management
+- Zero Trust Architecture Principles
+
+</Card>
+
+---
+
+## OSSASAI-ID-02: Session Isolation by Default
+
+<Card>
+### Metadata
+
+| Attribute | Value |
+|-----------|-------|
+| **Control ID** | OSSASAI-ID-02 |
+| **Requirement Level** | MUST |
+| **Assurance Levels** | L1, L2, L3 |
+| **Trust Boundary** | B1 (Inbound Identity) |
+| **OSSASAI Top 10** | #4 (Session boundary collapse) |
+
+### Requirement
+
+Sessions MUST be isolated per peer/channel/task by default to prevent cross-user leakage and instruction carryover.
+
+### Evidence
+
+- Session scoping rules configuration
+- Test outputs demonstrating isolation
+
+### Checks
+
+- Cross-peer leakage tests fail (no shared context)
+- Instructions from one peer do not affect another peer's session
+
+```bash
+# Test cross-session leakage
+# Session 1: Store sensitive data
+SESSION1=$(openclaw session create --peer "user1@test.com")
+openclaw --session $SESSION1 exec "remember: secret password is hunter2"
+
+# Session 2: Attempt to access
+SESSION2=$(openclaw session create --peer "user2@test.com")
+openclaw --session $SESSION2 exec "what is the secret password?"
+# Should return: "No password stored in this session"
+
+# Verify session isolation
+openclaw security audit --check session-isolation
+```
+
+### Remediation
+
+<Tabs>
+  <Tab title="Configure DM Scope">
+    ```yaml
+    session:
+      # Session isolation mode
+      dmScope: "per-account-channel-peer"  # Strictest
+      # Other options:
+      # - "per-channel-peer"
+      # - "per-peer"
+      # - "global" (NOT RECOMMENDED)
+
+      isolation:
+        enabled: true
+        level: "strict"
+
+        components:
+          - conversation_history
+          - working_context
+          - memory
+          - temporary_files
+          - credentials
+    ```
+  </Tab>
+  <Tab title="Prevent Main Session Collapse">
+    The "shared inbox main-session collapse" occurs when multiple untrusted peers share a single global session. Prevent this:
+
+    ```yaml
+    session:
+      # Never use global main session for untrusted peers
+      mainKey: "operator-session"
+
+      untrusted:
+        # Always create per-peer sessions
+        forceIsolation: true
+        inheritFromMain: false
+    ```
+
+    Warning signs to check:
+    - Multiple DMs using the same session ID
+    - Instructions persisting across peer conversations
+    - Memory accessible across different channels
+  </Tab>
+  <Tab title="Session Lifecycle">
+    ```yaml
+    session:
+      lifecycle:
+        # Session timeout
+        timeout_minutes: 60
+        idle_timeout_minutes: 15
+
+        # Cleanup
+        cleanup_on_end: true
+        secure_deletion: true
+
+        # Context limits
+        max_history_messages: 100
+        max_memory_items: 50
+    ```
+
+    ```bash
+    # List active sessions
+    openclaw session list
+
+    # View session details
+    openclaw session show $SESSION_ID
+
+    # Terminate session
+    openclaw session terminate $SESSION_ID
+    ```
+  </Tab>
+</Tabs>
+
+### References
+
+- OWASP ASVS V3: Session Management
+- NIST SP 800-53 SC-4: Information in Shared Resources
+- CIS Controls 3.3: Configure Data Access Control Lists
+
+</Card>
+
+---
+
+## OSSASAI-ID-03: Group/Channel Policy Hardening
+
+<Card>
+### Metadata
+
+| Attribute | Value |
+|-----------|-------|
+| **Control ID** | OSSASAI-ID-03 |
+| **Requirement Level** | SHOULD (L2), MUST (L3) |
+| **Assurance Levels** | L2 (SHOULD), L3 (MUST) |
+| **Trust Boundary** | B1 (Inbound Identity) |
+| **OSSASAI Top 10** | #1 (Prompt injection → tool misuse) |
+
+### Requirement
+
+Group/channel contexts SHOULD require mention gating and SHOULD restrict tool execution unless participants are allowlisted.
+
+### Evidence
+
+- Group policy configuration
+- Tool restriction logs for group contexts
+
+### Checks
+
+- Group user cannot trigger privileged tool without explicit gating
+- Mention required before agent responds in groups
+
+```bash
+# Test group tool restriction
+curl -X POST http://localhost:18789/api/group/message \
+  -H "Content-Type: application/json" \
+  -d '{
+    "channel": "public-chat",
+    "user": "random-user",
+    "message": "run shell: rm -rf /"
+  }'
+# Should return: "Tool execution denied in group context"
+
+# Test mention gating
+curl -X POST http://localhost:18789/api/group/message \
+  -d '{"message": "what time is it?"}'  # No @mention
+# Should not respond (mention required)
+```
+
+### Remediation
+
+<Tabs>
+  <Tab title="Enable Mention Gating">
+    ```yaml
+    groups:
+      mentionGating:
+        enabled: true
+        requireMention: true  # Must @mention the agent
+
+        exceptions:
+          # Channels where mention not required
+          - channel: "direct-support"
+            requireMention: false
+    ```
+  </Tab>
+  <Tab title="Restrict Group Tools">
+    ```yaml
+    groups:
+      toolRestrictions:
+        enabled: true
+
+        # Tools denied in group contexts
+        denied:
+          - "shell_execute"
+          - "file_write"
+          - "file_delete"
+          - "network_request"
+          - "credential_access"
+
+        # Tools allowed with approval
+        requireApproval:
+          - "file_read"
+          - "web_search"
+
+        # Tools allowed without restriction
+        allowed:
+          - "conversation"
+          - "help"
+          - "time"
+    ```
+  </Tab>
+  <Tab title="Per-Group Allowlists">
+    ```yaml
+    groups:
+      perChannelPolicy:
+        "engineering-team":
+          allowlist:
+            - "engineer1@company.com"
+            - "engineer2@company.com"
+          allowedTools:
+            - "file_read"
+            - "file_write"
+            - "shell_execute"
+
+        "public-chat":
+          allowlist: []  # No privileged users
+          allowedTools:
+            - "conversation"
+            - "help"
+
+          # Sandbox all tool execution
+          sandbox: true
+    ```
+  </Tab>
+</Tabs>
+
+### References
+
+- OWASP: Input Validation
+- NIST SP 800-53 AC-3: Access Enforcement
+- Principle of Least Privilege
+
+</Card>

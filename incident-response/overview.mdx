@@ -1,0 +1,77 @@
+---
+title: 'Incident Response Overview'
+description: 'Security incident response program for AI assistant environments'
+---
+
+## Overview
+
+This document establishes the incident response program for AI assistant security incidents. It defines classification, procedures, and roles for effective incident handling.
+
+## Incident Classification
+
+| Severity | Description | Examples | Response Time |
+|----------|-------------|----------|---------------|
+| **Critical** | Active exploitation, data breach | Sandbox escape, credential theft | Immediate |
+| **High** | Security control bypass | Auth bypass, injection success | < 4 hours |
+| **Medium** | Attempted attack, partial bypass | Failed injection, anomaly detected | < 24 hours |
+| **Low** | Policy violation, misconfiguration | Minor config drift | < 72 hours |
+
+## Response Phases
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                 Incident Response Lifecycle                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐            │
+│  │ Detect  │─►│ Contain │─►│Eradicate│─►│ Recover │            │
+│  └─────────┘  └─────────┘  └─────────┘  └─────────┘            │
+│       │                                       │                  │
+│       ▼                                       ▼                  │
+│  ┌─────────────────────────────────────────────────┐            │
+│  │              Lessons Learned                     │            │
+│  └─────────────────────────────────────────────────┘            │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Incident Types
+
+<CardGroup cols={2}>
+  <Card title="Playbooks" icon="book" href="/incident-response/playbooks">
+    Detailed procedures for specific incident types
+  </Card>
+  <Card title="Recovery" icon="rotate" href="/incident-response/recovery">
+    System recovery and restoration procedures
+  </Card>
+  <Card title="Post-Incident" icon="clipboard" href="/incident-response/post-incident">
+    Lessons learned and improvement process
+  </Card>
+</CardGroup>
+
+## Roles and Responsibilities
+
+| Role | Responsibilities |
+|------|------------------|
+| Incident Commander | Coordinate response, make decisions |
+| Security Analyst | Investigate, analyze, document |
+| Operations | Contain, recover systems |
+| Communications | Internal/external communication |
+| Legal | Regulatory, legal coordination |
+
+## Communication Plan
+
+### Internal Escalation
+
+| Severity | Notify |
+|----------|--------|
+| Critical | Exec team, Legal, All hands |
+| High | Security lead, Ops lead |
+| Medium | Security team |
+| Low | On-call analyst |
+
+### External Communication
+
+- Regulatory bodies (per requirements)
+- Affected customers (if data breach)
+- Law enforcement (if criminal activity)

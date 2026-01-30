@@ -1,0 +1,502 @@
+---
+title: 'L2 Deployment Guide'
+description: 'Network-aware deployment for teams and organizations'
+---
+
+## Overview
+
+L2 (Network-Aware) deployment extends L1 with controls for network-connected AI assistants used by teams and organizations.
+
+## Target Environment
+
+| Characteristic | L2 Requirement |
+|----------------|----------------|
+| Network | Required |
+| Users | Multiple users/teams |
+| Data sensitivity | Confidential (non-regulated) |
+| Deployment | Server or cloud |
+
+## Prerequisites
+
+- Complete [L1 deployment](/implementation/l1-deployment) first
+- TLS certificates (self-signed for internal, CA-signed for production)
+- Understanding of network architecture
+
+## Deployment Steps
+
+### Step 1: All L1 Controls
+
+Ensure all L1 controls are implemented. L2 builds on L1.
+
+```bash
+# Verify L1 compliance
+./ossasai-audit.sh --level L1
+```
+
+### Step 2: TLS Configuration (NS-01)
+
+Enable TLS for all network communications:
+
+```yaml
+# Network security
+network:
+  tls:
+    enabled: true
+    required: true  # No plaintext allowed
+    min_version: "TLS1.2"
+    preferred_version: "TLS1.3"
+
+    # Certificate configuration
+    certificate:
+      cert_file: "/etc/ocsas/certs/server.crt"
+      key_file: "/etc/ocsas/certs/server.key"
+      ca_file: "/etc/ocsas/certs/ca.crt"
+
+    # Cipher configuration
+    ciphers:
+      - "TLS_AES_256_GCM_SHA384"
+      - "TLS_AES_128_GCM_SHA256"
+      - "TLS_CHACHA20_POLY1305_SHA256"
+
+    # HTTP upgrade
+    upgrade_http: true
+    hsts:
+      enabled: true
+      max_age: 31536000
+```
+
+**Verification:**
+```bash
+./ossasai-audit.sh --check NS-01
+
+# Test TLS
+openssl s_client -connect localhost:8443 -tls1_2
+# Should connect successfully
+
+openssl s_client -connect localhost:8443 -tls1_1
+# Should fail - TLS 1.1 not allowed
+```
+
+### Step 3: Certificate Validation (NS-02)
+
+Configure certificate validation:
+
+```yaml
+network:
+  certificates:
+    validation:
+      enabled: true
+      verify_chain: true
+      verify_hostname: true
+      check_revocation: true
+
+    # Trust store
+    trust_store:
+      use_system: true
+      additional:
+        - "/etc/ocsas/certs/internal-ca.crt"
+
+    # Certificate pinning (recommended)
+    pinning:
+      enabled: true
+      pins:
+        - host: "api.example.com"
+          sha256: "base64encodedpin=="
+```
+
+### Step 4: Session Isolation (ID-02)
+
+Implement per-session isolation:
+
+```yaml
+# Session management
+sessions:
+  isolation:
+    enabled: true
+    level: "strict"
+
+  # Storage isolation
+  storage:
+    per_session: true
+    base_path: "/var/lib/ocsas/sessions"
+    encryption:
+      enabled: true
+      algorithm: "AES-256-GCM"
+
+  # Context isolation
+  context:
+    shared: false
+    inherit_from_parent: false
+
+  # Cleanup
+  cleanup:
+    on_end: true
+    secure_delete: true
+
+  # Timeouts
+  timeout:
+    idle_minutes: 15
+    absolute_minutes: 480  # 8 hours
+```
+
+### Step 5: Credential Storage (ID-03)
+
+Configure secure credential storage:
+
+```yaml
+# Credential management
+credentials:
+  storage:
+    method: "system_keychain"  # or "vault" for HashiCorp Vault
+    service_name: "ocsas"
+
+  # Encryption
+  encryption:
+    enabled: true
+    key_derivation: "PBKDF2"
+    iterations: 100000
+
+  # Rotation
+  rotation:
+    api_keys:
+      max_age_days: 90
+      warn_before_days: 14
+    tokens:
+      access_token_ttl_minutes: 60
+      refresh_token_ttl_days: 30
+
+  # Prohibited storage
+  prohibited:
+    - plaintext_files
+    - environment_variables  # Except secure environments
+    - conversation_history
+```
+
+### Step 6: Resource Limits (TB-03)
+
+Set resource consumption limits:
+
+```yaml
+# Resource limits
+resources:
+  # CPU
+  cpu:
+    max_percent: 50
+    max_time_seconds: 300
+    nice_level: 10
+
+  # Memory
+  memory:
+    max_mb: 1024
+    max_virtual_mb: 2048
+
+  # Disk
+  disk:
+    max_file_size_mb: 100
+    max_total_mb: 1000
+    temp_quota_mb: 500
+
+  # Network
+  network:
+    max_connections: 10
+    max_bandwidth_kbps: 1000
+    timeout_seconds: 30
+
+  # Operations
+  operations:
+    max_concurrent: 5
+    timeout_seconds: 300
+```
+
+### Step 7: Supply Chain Security (SC-01, SC-02)
+
+Enable plugin and dependency verification:
+
+```yaml
+# Plugin verification (SC-01)
+plugins:
+  verification:
+    enabled: true
+    level: "strict"
+
+  trusted_sources:
+    - type: "registry"
+      url: "https://plugins.ocsas.dev"
+    - type: "github"
+      organizations: ["ocsas", "verified-publishers"]
+
+  restrictions:
+    allow_local: false
+    allow_unsigned: false
+
+# Dependency integrity (SC-02)
+dependencies:
+  integrity:
+    enabled: true
+    require_lockfile: true
+    verify_hashes: true
+
+  vulnerability_scan:
+    enabled: true
+    fail_on_severity: "high"
+
+  # Dependency confusion protection
+  private_namespaces:
+    - "@mycompany/"
+  registry_mapping:
+    "@mycompany/*": "https://npm.internal.company.com"
+```
+
+### Step 8: API Security (NS-03)
+
+Configure API endpoint security:
+
+```yaml
+# API security
+api:
+  authentication:
+    required: true
+    methods:
+      - type: "bearer_token"
+      - type: "api_key"
+
+  authorization:
+    enabled: true
+    default_deny: true
+
+  rate_limiting:
+    enabled: true
+    default:
+      requests_per_minute: 60
+      burst: 10
+
+  input_validation:
+    max_request_size_mb: 10
+    allowed_content_types:
+      - "application/json"
+
+  security_headers:
+    enabled: true
+    headers:
+      X-Content-Type-Options: "nosniff"
+      X-Frame-Options: "DENY"
+      Strict-Transport-Security: "max-age=31536000"
+```
+
+### Step 9: Update Verification (CP-03)
+
+Enable update integrity checking:
+
+```yaml
+# Update security
+updates:
+  verification:
+    required: true
+    signature_check: true
+
+  trust:
+    keys:
+      - id: "release-key"
+        url: "https://ocsas.dev/keys/release.asc"
+
+  channel: "stable"
+  auto_update: false  # Require explicit approval
+```
+
+### Step 10: Cache Security (LS-03)
+
+Configure cache and temp file security:
+
+```yaml
+# Cache security
+cache:
+  per_session: true
+  base_path: "/var/cache/ocsas"
+
+  encryption:
+    enabled: true
+    algorithm: "AES-256-GCM"
+
+  retention:
+    max_age_hours: 24
+    cleanup_on_exit: true
+
+# Temp files
+temp:
+  per_session: true
+  base_path: "/tmp/ocsas"
+  permissions: "0700"
+  secure_delete: true
+```
+
+## Complete L2 Configuration
+
+<Accordion title="Full L2 Configuration File">
+```yaml
+# /etc/ocsas/config.yaml
+# OSSASAI L2 (Network-Aware) Configuration
+
+version: "1.0"
+assurance_level: "L2"
+
+# Include all L1 controls (abbreviated)
+authentication:
+  required: true
+  method: "os_user"
+
+filesystem:
+  scope: "workdir"
+  follow_symlinks: false
+
+commands:
+  mode: "allowlist"
+  require_approval: true
+
+# L2 Network Security
+network:
+  tls:
+    required: true
+    min_version: "TLS1.2"
+    certificate:
+      cert_file: "/etc/ocsas/certs/server.crt"
+      key_file: "/etc/ocsas/certs/server.key"
+  certificates:
+    validation:
+      enabled: true
+      verify_chain: true
+      verify_hostname: true
+
+# L2 Session Security
+sessions:
+  isolation:
+    enabled: true
+    level: "strict"
+  storage:
+    per_session: true
+    encryption:
+      enabled: true
+  timeout:
+    idle_minutes: 15
+
+# L2 Credentials
+credentials:
+  storage:
+    method: "system_keychain"
+  rotation:
+    api_keys:
+      max_age_days: 90
+
+# L2 Resource Limits
+resources:
+  cpu:
+    max_percent: 50
+  memory:
+    max_mb: 1024
+  operations:
+    timeout_seconds: 300
+
+# L2 Supply Chain
+plugins:
+  verification:
+    enabled: true
+    level: "strict"
+
+dependencies:
+  integrity:
+    enabled: true
+    require_lockfile: true
+  vulnerability_scan:
+    enabled: true
+    fail_on_severity: "high"
+
+# L2 API Security
+api:
+  authentication:
+    required: true
+  rate_limiting:
+    enabled: true
+  security_headers:
+    enabled: true
+
+# L2 Updates
+updates:
+  verification:
+    required: true
+    signature_check: true
+
+# L2 Cache
+cache:
+  per_session: true
+  encryption:
+    enabled: true
+  cleanup_on_exit: true
+
+logging:
+  enabled: true
+  security:
+    log_all_events: true
+```
+</Accordion>
+
+## Validation
+
+```bash
+# Full L2 compliance check
+./ossasai-audit.sh --level L2 --verbose
+
+# Expected: All 17 L2 controls pass
+```
+
+## Deployment Architectures
+
+### Single Server
+
+```
+┌─────────────────────────────────────┐
+│           Single Server              │
+├─────────────────────────────────────┤
+│  ┌─────────────────────────────┐   │
+│  │     AI Assistant Service     │   │
+│  │  ┌───────┐  ┌───────────┐   │   │
+│  │  │  TLS  │──│  Session  │   │   │
+│  │  │       │  │  Manager  │   │   │
+│  │  └───────┘  └───────────┘   │   │
+│  └─────────────────────────────┘   │
+│                │                    │
+│  ┌─────────────────────────────┐   │
+│  │     Session Storage          │   │
+│  │   (Encrypted, Isolated)      │   │
+│  └─────────────────────────────┘   │
+└─────────────────────────────────────┘
+```
+
+### Load Balanced
+
+```
+                   ┌─────────────┐
+                   │   Load      │
+       Users ─────►│  Balancer   │
+                   │  (TLS Term) │
+                   └──────┬──────┘
+                          │
+         ┌────────────────┼────────────────┐
+         │                │                │
+    ┌────▼────┐     ┌────▼────┐     ┌────▼────┐
+    │ Server1 │     │ Server2 │     │ Server3 │
+    └────┬────┘     └────┬────┘     └────┬────┘
+         │                │                │
+         └────────────────┼────────────────┘
+                          │
+                   ┌──────▼──────┐
+                   │   Shared    │
+                   │   Session   │
+                   │   Store     │
+                   │  (Redis/DB) │
+                   └─────────────┘
+```
+
+## Next Steps
+
+- [L3 Deployment](/implementation/l3-deployment) for high-assurance requirements
+- [Hardening Checklist](/implementation/hardening-checklist) for additional security
+- [CI/CD Integration](/implementation/ci-cd-integration) for automated compliance

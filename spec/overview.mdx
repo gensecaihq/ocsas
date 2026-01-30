@@ -1,0 +1,419 @@
+---
+title: 'Specification Overview'
+description: 'OSSASAI normative requirements, conformance criteria, and framework structure'
+---
+
+## Abstract
+
+This document constitutes the **normative specification** for the Open Security Standard for Agentic Systems (OSSASAI). It defines the formal requirements, conformance criteria, and verification procedures for securing AI agent runtimes. The specification employs RFC 2119/8174 terminology to distinguish mandatory, recommended, and optional requirements across three assurance levels.
+
+<Note>
+**Normative Language:** The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119) and [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174).
+</Note>
+
+## Terminology and Definitions
+
+The following terms have specific meanings within OSSASAI:
+
+| Term | Definition |
+|------|------------|
+| **Agent** | A software system that accepts natural language inputs and executes actions via tool interfaces |
+| **Tool** | A programmatic interface that enables an agent to perform actions with real-world consequences |
+| **Control Plane** | Administrative interfaces for agent configuration, monitoring, and governance |
+| **Trust Boundary** | A logical demarcation where data or control flow crosses security domains |
+| **Coercion Attack** | An attack that manipulates an agent into unintended actions without exploiting software vulnerabilities |
+| **Profile** | An ecosystem-specific mapping of OSSASAI controls to concrete platform configurations |
+| **Operator** | A human user with administrative authority over agent configuration and behavior |
+| **Peer** | An entity (human or automated) that interacts with an agent through its input interfaces |
+
+## Scope
+
+### Systems In Scope
+
+OSSASAI applies to **tool-enabled AI agent systems** that satisfy the following criteria:
+
+1. Accept natural language or structured inputs from potentially untrusted sources
+2. Execute actions with real-world consequences via tool interfaces
+3. Maintain persistent state across interactions (sessions, memory, credentials)
+4. Operate with some degree of autonomy in decision-making
+
+**Exemplar System Categories:**
+
+| Category | Examples | Applicable Boundaries |
+|----------|----------|----------------------|
+| Conversational Agents | Slack bots, Discord bots, Teams integrations | B1, B2, B4 |
+| Enterprise Copilots | SaaS integrations, API connectors, workflow automation | B1, B2, B3, B4 |
+| Multi-Agent Systems | Orchestrated agents, shared memory architectures | All boundaries |
+| Development Assistants | AI coding tools, IDE integrations | B2, B3, B4 |
+| Autonomous Agents | Web browsing agents, task automation | All boundaries |
+| Agent Frameworks | LangChain, AutoGPT, custom implementations | All boundaries |
+
+### Systems Out of Scope
+
+OSSASAI does **not** address:
+
+- **Model-level safety**: Alignment, constitutional AI, output harmlessness (covered by AI safety research)
+- **Training security**: Data poisoning, model theft, training infrastructure (covered by ML security)
+- **General software security**: Buffer overflows, SQL injection, memory corruption (covered by OWASP, CWE)
+- **Organizational governance**: AI ethics policies, responsible use frameworks (covered by IEEE, ISO/IEC)
+
+<Info>
+OSSASAI complements these domains by focusing specifically on **runtime security controls** at the agent-tool interface—the operational layer where theoretical risks manifest as real-world incidents.
+</Info>
+
+## Conformance Framework
+
+### Assurance Level Architecture
+
+OSSASAI defines three conformance levels representing graduated security requirements. Each level builds upon the previous, with L3 representing the most comprehensive security posture.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      OSSASAI Assurance Level Hierarchy                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Level 3 ████████████████████████████████████████████  HIGH-RISK RUNTIME    │
+│          ─────────────────────────────────────────────                      │
+│          Threat Profile: Sophisticated adversaries, targeted attacks        │
+│          Environment: Multi-tenant, plugin-rich, broad external access      │
+│          Controls: Full catalog + formal verification recommended           │
+│          Evidence: Complete audit trail, third-party assessment             │
+│                                                                              │
+│  Level 2 █████████████████████████████████  NETWORK-AWARE                   │
+│          ─────────────────────────────────                                  │
+│          Threat Profile: Opportunistic attackers, untrusted networks        │
+│          Environment: Remote access, team usage, network-exposed            │
+│          Controls: Core catalog + network security controls                 │
+│          Evidence: Automated verification + configuration review            │
+│                                                                              │
+│  Level 1 ████████████████████████  LOCAL-FIRST BASELINE                     │
+│          ────────────────────────                                           │
+│          Threat Profile: Accidental exposure, local privilege abuse         │
+│          Environment: Single operator, local administration                 │
+│          Controls: Baseline security controls                               │
+│          Evidence: Self-assessment, automated audit                         │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Level Selection Criteria
+
+Organizations SHOULD select assurance levels based on deployment risk factors:
+
+| Risk Factor | L1 Indicator | L2 Indicator | L3 Indicator |
+|-------------|--------------|--------------|--------------|
+| **Network Exposure** | Loopback only | LAN/VPN/Tailnet | Public internet |
+| **User Population** | Single operator | Known team | Multi-tenant/public |
+| **Tool Capabilities** | Read-only, sandboxed | Limited write access | Full system access |
+| **Data Sensitivity** | Non-sensitive | Internal business | Regulated/PII/secrets |
+| **Autonomy Level** | Human-in-loop always | Approval for sensitive | Autonomous operation |
+| **Attack Surface** | Minimal integrations | Standard connectors | Plugin ecosystem |
+
+### Conformance Requirements
+
+To claim conformance to an OSSASAI assurance level, an implementation:
+
+<AccordionGroup>
+  <Accordion title="Mandatory Requirements" icon="check">
+**All claimed levels:**
+
+1. **MUST** implement all controls designated REQUIRED at the claimed level
+2. **MUST** implement all REQUIRED controls from lower levels (cumulative)
+3. **MUST** provide verifiable evidence of control implementation
+4. **MUST** pass automated verification procedures for verifiable controls
+5. **MUST** document any control exceptions with risk justification
+6. **MUST NOT** disable security controls without operator acknowledgment
+  </Accordion>
+
+  <Accordion title="Recommended Requirements" icon="thumbs-up">
+**For robust conformance:**
+
+1. **SHOULD** implement RECOMMENDED controls at the claimed level
+2. **SHOULD** conduct periodic conformance re-verification
+3. **SHOULD** maintain evidence retention for audit purposes
+4. **SHOULD** document configuration changes affecting security posture
+  </Accordion>
+
+  <Accordion title="Partial Conformance" icon="circle-half-stroke">
+**Implementations not meeting full requirements:**
+
+1. **MUST NOT** claim conformance to levels where requirements are unmet
+2. **MAY** claim conformance to a lower level if all requirements are satisfied
+3. **MAY** publish a conformance statement detailing implemented controls
+4. **SHOULD** document a remediation plan for unmet controls
+  </Accordion>
+</AccordionGroup>
+
+## Normative Principles
+
+OSSASAI controls are derived from five foundational security principles. These principles inform control design and provide interpretive guidance for edge cases.
+
+### GEN-01: Security by Default
+
+**Requirement Level:** MUST (All Levels)
+
+Implementations MUST be secure in their default configuration. Security features MUST NOT require explicit opt-in by users.
+
+**Rationale:** Secure defaults reduce the likelihood of accidental misconfiguration—a primary driver of agent security incidents (Greshake et al., 2023). Users should achieve baseline protection without security expertise.
+
+**Verification:**
+- Review default configuration files for security-relevant settings
+- Verify that all controls are enabled without user intervention
+- Test that fresh installations pass automated security audits
+
+**References:** NIST SP 800-123 (Guide to General Server Security), CIS Benchmark methodology
+
+---
+
+### GEN-02: Fail Secure
+
+**Requirement Level:** MUST (All Levels)
+
+Implementations MUST fail to a secure state when errors occur. Failures MUST NOT result in security control bypass.
+
+**Rationale:** Error handling paths are common exploit targets. A system that fails open (permissive) creates opportunities for attackers to trigger controlled failures.
+
+**Verification:**
+- Inject faults in authentication, authorization, and sandboxing subsystems
+- Verify that security controls remain enforced during error conditions
+- Test that partial system failures do not expose protected resources
+
+**References:** OWASP Secure Coding Practices, IEEE 1012-2016 (Software Verification and Validation)
+
+---
+
+### GEN-03: Principle of Least Privilege
+
+**Requirement Level:** MUST (All Levels)
+
+Implementations MUST operate with the minimum privileges necessary for intended functionality. Elevated privileges MUST be requested only when required and MUST be relinquished immediately after use.
+
+**Rationale:** Overprivileged components amplify the impact of successful attacks. Least privilege limits lateral movement and blast radius (Saltzer & Schroeder, 1975).
+
+**Verification:**
+- Audit runtime privilege levels for all agent components
+- Verify privilege escalation follows explicit request patterns
+- Test that elevated privileges are time-bounded and scoped
+
+**References:** NIST SP 800-53 AC-6 (Least Privilege), Saltzer & Schroeder (1975) "Protection of Information in Computer Systems"
+
+---
+
+### GEN-04: Defense in Depth
+
+**Requirement Level:** SHOULD (L1), MUST (L2/L3)
+
+Implementations SHOULD (L1) / MUST (L2/L3) implement multiple independent layers of security controls. No single control failure SHOULD result in complete security bypass.
+
+**Rationale:** Layered defenses provide resilience against individual control failures. Defense in depth acknowledges that all controls have failure modes (NSA, "Defense in Depth: A Practical Strategy").
+
+**Verification:**
+- Analyze control dependencies and identify single points of failure
+- Verify that redundant controls exist for critical security functions
+- Test that disabling individual controls does not fully compromise security
+
+**References:** NSA Defense in Depth Strategy, NIST SP 800-53 SC-3 (Security Function Isolation)
+
+---
+
+### GEN-05: Audit Logging
+
+**Requirement Level:** SHOULD (L1), MUST (L2/L3)
+
+Implementations SHOULD (L1) / MUST (L2/L3) maintain comprehensive audit logs of security-relevant events. Logs MUST be tamper-evident at L3.
+
+**Rationale:** Audit trails enable incident investigation, compliance verification, and forensic analysis. Tamper-evident logging prevents attackers from covering their tracks.
+
+**Verification:**
+- Verify audit log generation for security-relevant events
+- Test log retention mechanisms and access controls
+- At L3: Verify cryptographic integrity protection for audit logs
+
+**References:** NIST SP 800-92 (Guide to Computer Security Log Management), SOC 2 Type II CC6.1
+
+## Control Specification Structure
+
+Each control in the OSSASAI catalog follows a standardized structure enabling consistent implementation and verification:
+
+```yaml
+# OSSASAI Control Specification Schema
+Control ID: OSSASAI-[DOMAIN]-[NUMBER]  # Unique identifier
+Title: [Descriptive Title]              # Human-readable name
+Version: [Major.Minor]                  # Control version
+
+# Requirements
+Requirement Level: MUST | SHOULD | MAY  # RFC 2119 classification
+Assurance Levels: L1 | L2 | L3 | All    # Applicable levels
+Requirement: |                          # Normative description
+  [Detailed requirement using RFC 2119 keywords]
+
+# Implementation
+Rationale: [Security justification]
+Remediation: [Implementation guidance]
+Configuration: [Example settings]
+
+# Verification
+Evidence:                               # Required artifacts
+  - [Artifact type and description]
+Checks:                                 # Verification procedures
+  - [Automated or manual check]
+Verification Script: [Optional automation]
+
+# Traceability
+References:                             # External mappings
+  - NIST: [SP 800-53 control]
+  - OWASP: [ASVS requirement]
+  - CIS: [Control reference]
+Related Controls: [OSSASAI control IDs]
+```
+
+### Control Domains
+
+OSSASAI organizes controls into seven domains aligned with the trust boundary model:
+
+| Domain | Prefix | Boundary | Control Focus | Control Count |
+|--------|--------|----------|---------------|---------------|
+| **Control Plane** | CP | B2 | Configuration, admin access, exposure | 4 |
+| **Identity & Session** | ID | B1 | Authentication, pairing, isolation | 3 |
+| **Tool Blast Radius** | TB | B3 | Tool governance, privileges, sandboxing | 4 |
+| **Local State** | LS | B4 | Secrets, logging, memory, retention | 4 |
+| **Supply Chain** | SC | B3 | Plugin trust, inventory, pinning | 2 |
+| **Formal Verification** | FV | All | High-assurance proofs (optional) | 3 |
+| **Network Security** | NS | B2, B3 | Transport, endpoints, egress | 4 |
+
+## Trust Model
+
+### Trust Boundary Definitions
+
+OSSASAI defines four canonical trust boundaries representing security-relevant interfaces in agent architectures:
+
+| Boundary | ID | Security Function | Threat Surface |
+|----------|-----|-------------------|----------------|
+| **Inbound Identity** | B1 | Input validation, peer verification, coercion resistance | Untrusted senders, prompt injection, social engineering |
+| **Control Plane** | B2 | Authentication, authorization, exposure control | Admin UI/API/CLI, configuration interfaces |
+| **Tool Boundary** | B3 | Least privilege, sandboxing, approval gates, egress control | Tool invocation, capability grants, external connectors |
+| **Local State** | B4 | Secrets protection, redaction, retention, memory safety | Credentials, logs, memory, transcripts, caches |
+
+### Trust Assumptions
+
+OSSASAI makes explicit trust assumptions to bound the security model:
+
+<AccordionGroup>
+  <Accordion title="Trusted Components" icon="shield-check">
+**The following are assumed trustworthy:**
+
+1. **Operating System Kernel**: The underlying OS kernel is correctly implemented and not compromised
+2. **Hardware Platform**: Physical hardware operates as designed (no hardware trojans or supply chain compromise)
+3. **Cryptographic Primitives**: Standard cryptographic algorithms (AES, SHA-256, ECDSA) are secure when correctly implemented
+4. **Operator Intent**: The human operator acts with legitimate intent toward the system (insider threat modeled separately)
+  </Accordion>
+
+  <Accordion title="Untrusted Components" icon="shield-exclamation">
+**The following are NOT assumed trustworthy:**
+
+1. **External Inputs**: All inputs from peers, channels, and external systems
+2. **Network Infrastructure**: Network paths between components (require TLS)
+3. **Third-Party Plugins**: Extensions from external sources (require verification)
+4. **Retrieved Content**: Data from external APIs, web pages, or databases
+5. **Model Outputs**: LLM-generated content (may be influenced by adversarial inputs)
+  </Accordion>
+</AccordionGroup>
+
+### Threat Model Integration
+
+OSSASAI controls address the threat model defined in [Threat Model Overview](/threat-model/overview), including:
+
+- **Adversary Classes A1–A5**: From opportunistic to nation-state
+- **AI Agent Threat Taxonomy (AATT)**: Coercion, capability escalation, context manipulation, supply chain
+- **STRIDE Categories**: Applied to agent-specific attack surfaces
+
+## Profile Mechanism
+
+A **Profile** provides an ecosystem-specific mapping of OSSASAI controls to concrete platform configurations, enabling vendor-neutral requirements with implementation-specific guidance.
+
+### Profile Requirements
+
+A conformant Profile MUST include:
+
+| Component | Description |
+|-----------|-------------|
+| **Profile ID** | Unique identifier following pattern `OSSASAI-PROFILE-[PLATFORM]-[NAME]-[VERSION]` |
+| **Control Mapping** | Table mapping each OSSASAI control to platform configuration |
+| **Evidence Procedures** | How to generate required evidence artifacts |
+| **Platform Extensions** | Additional platform-specific controls (if any) |
+| **Conformance Recipes** | Step-by-step deployment guides for L1/L2/L3 |
+| **Verification Tooling** | Platform-specific audit commands and scripts |
+
+### Reference Profile
+
+<CardGroup cols={2}>
+  <Card
+    title="OCSAS - OpenClaw Security Assurance Standard"
+    icon="terminal"
+    href="/profiles/openclaw"
+  >
+    Official OSSASAI implementation profile for OpenClaw agent runtime. Demonstrates complete control mapping with CLI-based verification.
+  </Card>
+</CardGroup>
+
+## Versioning and Evolution
+
+### Semantic Versioning
+
+OSSASAI follows semantic versioning (SemVer) for specification releases:
+
+- **MAJOR.MINOR.PATCH** (e.g., 1.2.3)
+- Major versions indicate breaking changes
+- Minor versions add controls or expand coverage
+- Patch versions contain editorial corrections
+
+### Change Classification
+
+| Change Type | Version Impact | Transition Period |
+|-------------|----------------|-------------------|
+| Add new control | Minor | Immediate |
+| Elevate SHOULD to MUST | Major | 6-month grace period |
+| Demote MUST to SHOULD | Major | Immediate |
+| Add new assurance level | Major | 12-month transition |
+| Modify verification procedure | Minor | 3-month transition |
+| Editorial clarification | Patch | Immediate |
+
+### Backward Compatibility
+
+Implementations conformant to OSSASAI version X.Y.Z:
+
+- **MUST** remain conformant for all X.Y.* releases
+- **SHOULD** achieve conformance to minor version updates within 6 months
+- **MUST** achieve conformance to major version updates within grace period
+
+## References
+
+### Normative References
+
+The following documents are essential for OSSASAI interpretation:
+
+- [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119): Bradner, S. "Key words for use in RFCs to Indicate Requirement Levels." BCP 14, March 1997.
+- [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174): Leiba, B. "Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words." BCP 14, May 2017.
+
+### Informative References
+
+**Security Frameworks:**
+- [OWASP ASVS v4.0](https://owasp.org/www-project-application-security-verification-standard/): Application Security Verification Standard
+- [NIST SP 800-53 Rev 5](https://csrc.nist.gov/publications/detail/sp/800-53/rev-5/final): Security and Privacy Controls for Information Systems and Organizations
+- [NIST Cybersecurity Framework v2.0](https://www.nist.gov/cyberframework): Framework for Improving Critical Infrastructure Cybersecurity
+- [CIS Controls v8](https://www.cisecurity.org/controls): Center for Internet Security Critical Security Controls
+- [SLSA v1.0](https://slsa.dev/): Supply-chain Levels for Software Artifacts
+
+**AI Security Research:**
+- Greshake, K., et al. (2023). "Not What You've Signed Up For: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection." *arXiv:2302.12173*
+- Perez, F., & Ribeiro, I. (2022). "Ignore This Title and HackAPrompt." *EMNLP 2023*
+- OWASP. (2023). "OWASP Top 10 for Large Language Model Applications."
+
+**Foundational Security:**
+- Saltzer, J.H., & Schroeder, M.D. (1975). "The Protection of Information in Computer Systems." *Proceedings of the IEEE*, 63(9), 1278-1308.
+- [MITRE ATT&CK Framework](https://attack.mitre.org/): Adversarial Tactics, Techniques, and Common Knowledge
+
+**International Standards:**
+- ISO/IEC 27001:2022: Information Security Management Systems
+- ISO/IEC 27701:2019: Privacy Information Management
+- NIST AI RMF 1.0: Artificial Intelligence Risk Management Framework

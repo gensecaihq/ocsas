@@ -1,0 +1,1019 @@
+---
+title: 'OCSAS - OpenClaw Security Assurance Standard'
+description: 'OSSASAI implementation profile for the OpenClaw AI agent gateway'
+---
+
+## Profile Overview
+
+**Profile ID:** `OSSASAI-PROFILE-OPENCLAW-OCSAS-0.1`
+
+**OCSAS** (OpenClaw Security Assurance Standard) is the official OSSASAI implementation profile for [OpenClaw](https://openclaw.ai) — a WhatsApp, Telegram, Discord, iMessage, and Slack gateway for AI agents with shell, filesystem, and browser access.
+
+This profile maps OSSASAI controls to OpenClaw's existing security architecture, CLI tooling, and formal verification suite. OCSAS complements OpenClaw's built-in security by providing a structured verification framework.
+
+<Note>
+**OpenClaw Security Philosophy:** "Access control before intelligence." Most failures are not fancy exploits—they're "someone messaged the bot and the bot did what they asked." OpenClaw's stance: Identity first, scope next, model last.
+</Note>
+
+## OpenClaw Security Architecture
+
+OpenClaw implements a defense-in-depth security model with the following layers:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     OpenClaw Security Architecture                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  1. INBOUND GATING          2. SESSION ISOLATION      3. TOOL GOVERNANCE    │
+│  ──────────────────         ──────────────────────    ────────────────────  │
+│  • DM Policy                • dmScope isolation       • Tool allow/deny     │
+│    (pairing/allowlist)      • Per-channel-peer       • Elevated exec gates  │
+│  • Group allowlists         • Identity links          • Approval workflows  │
+│  • Mention gating                                                           │
+│                                                                              │
+│  4. SANDBOXING              5. LOCAL STATE            6. NETWORK EXPOSURE   │
+│  ────────────────           ─────────────────         ───────────────────   │
+│  • Docker isolation         • File permissions        • Loopback binding    │
+│  • Workspace access         • Log redaction           • Gateway auth        │
+│  • Scope (session/agent)    • Credential storage      • Trusted proxies     │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+## Quick Security Check
+
+OpenClaw provides built-in OSSASAI-compatible security auditing:
+
+```bash
+# Basic security audit
+openclaw security audit
+
+# Deep audit (includes live Gateway probe)
+openclaw security audit --deep
+
+# Auto-fix common issues
+openclaw security audit --fix
+```
+
+**What the audit checks:**
+- Inbound access (DM policies, group policies, allowlists)
+- Tool blast radius (elevated tools + open rooms)
+- Network exposure (Gateway bind/auth, Tailscale Serve/Funnel)
+- Browser control exposure (remote nodes, relay ports)
+- Local disk hygiene (permissions, symlinks, synced folders)
+- Plugin allowlists
+- Model hygiene (warns on legacy models with tools enabled)
+
+---
+
+## Control Mapping
+
+### B2 — Control Plane Controls
+
+<AccordionGroup>
+  <Accordion title="OSSASAI-CP-01: Default-Deny Control Plane Exposure" icon="shield">
+**OpenClaw Implementation:**
+- Gateway defaults to loopback binding (`bind: "loopback"`)
+- Non-loopback binds (`lan`, `tailnet`, `custom`) explicitly expand attack surface
+- Audit warns on public exposure without auth
+
+**Configuration (`~/.openclaw/openclaw.json`):**
+```json5
+{
+  gateway: {
+    mode: "local",
+    bind: "loopback",      // Default - only local clients
+    port: 18789
+  }
+}
+```
+
+**Verification:**
+```bash
+openclaw security audit --deep
+# Check: "Gateway exposure" section should show loopback-only
+```
+
+**Evidence:**
+- `openclaw security audit --deep` output
+- `netstat -an | grep 18789` showing 127.0.0.1 binding
+
+**OpenClaw Docs:** [Security - Network Exposure](https://docs.openclaw.ai/gateway/security#04-network-exposure-bind--port--firewall)
+  </Accordion>
+
+  <Accordion title="OSSASAI-CP-02: Strong Administrative Authentication" icon="lock">
+**OpenClaw Implementation:**
+- Gateway auth is **required by default** (fail-closed)
+- Supports token-based and password-based authentication
+- Onboarding wizard auto-generates token
+- Tailscale Serve identity headers supported (`allowTailscale`)
+
+**Configuration:**
+```json5
+{
+  gateway: {
+    auth: {
+      mode: "token",
+      token: "your-long-random-token"
+      // Or: mode: "password", password via OPENCLAW_GATEWAY_PASSWORD env
+    }
+  }
+}
+```
+
+**Token Management:**
+```bash
+# Generate gateway token
+openclaw doctor --generate-gateway-token
+
+# Rotation: update token in config, restart Gateway, update remote clients
+```
+
+**Verification:**
+```bash
+openclaw security audit --check gateway-auth
+```
+
+**OpenClaw Docs:** [Security - Gateway WebSocket Auth](https://docs.openclaw.ai/gateway/security#05-lock-down-the-gateway-websocket-local-auth)
+  </Accordion>
+
+  <Accordion title="OSSASAI-CP-03: Proxy Trust Boundary Configuration" icon="server">
+**OpenClaw Implementation:**
+- `gateway.trustedProxies` controls which IPs can set forwarded headers
+- Prevents X-Forwarded-For spoofing from untrusted sources
+- Connections from non-trusted proxies with forwarded headers are rejected if auth is disabled
+
+**Configuration:**
+```json5
+{
+  gateway: {
+    trustedProxies: [
+      "127.0.0.1"          // If proxy runs on localhost
+    ],
+    auth: {
+      mode: "password",
+      password: "${OPENCLAW_GATEWAY_PASSWORD}"
+    }
+  }
+}
+```
+
+**Verification:**
+```bash
+openclaw security audit
+# Warnings appear if trustedProxies is misconfigured
+```
+
+**OpenClaw Docs:** [Security - Reverse Proxy Configuration](https://docs.openclaw.ai/gateway/security#reverse-proxy-configuration)
+  </Accordion>
+
+  <Accordion title="OSSASAI-CP-04: Operator/Agent Identity Separation" icon="users">
+**OpenClaw Implementation:**
+- Separate credential stores: `credentials/`, `agents/<id>/agent/auth-profiles.json`
+- DM allowlist controls who can trigger the bot
+- Group allowlist + mention gating control scope
+- `commands.useAccessGroups` gates slash command authorization
+
+**Configuration:**
+```json5
+{
+  commands: {
+    useAccessGroups: true   // Only authorized senders can use directives
+  },
+  channels: {
+    whatsapp: {
+      allowFrom: ["+15555550123"]  // Only this number can DM
+    }
+  }
+}
+```
+
+**Evidence:**
+- Distinct credential paths on disk
+- `openclaw security audit` identity checks
+
+**OpenClaw Docs:** [Security - Command Authorization](https://docs.openclaw.ai/gateway/security#command-authorization-model)
+  </Accordion>
+</AccordionGroup>
+
+### B1 — Inbound Identity Controls
+
+<AccordionGroup>
+  <Accordion title="OSSASAI-ID-01: Peer Verification for New Contacts" icon="handshake">
+**OpenClaw Implementation:**
+- DM policy controls who can message the bot: `pairing`, `allowlist`, `open`, `disabled`
+- **Pairing (default):** Unknown senders receive a code; bot ignores until approved
+- Codes expire after 1 hour; pending requests capped at 3 per channel
+- Approvals stored in `~/.openclaw/credentials/<channel>-allowFrom.json`
+
+**Configuration:**
+```json5
+{
+  channels: {
+    whatsapp: {
+      dmPolicy: "pairing"    // Default - require approval for new contacts
+      // Or: "allowlist" - block unknowns, "open" - allow anyone (dangerous)
+    }
+  }
+}
+```
+
+**Pairing Management:**
+```bash
+# List pending pairing requests
+openclaw pairing list whatsapp
+
+# Approve a request
+openclaw pairing approve whatsapp <code>
+
+# Deny a request
+openclaw pairing deny whatsapp <code>
+```
+
+**Verification:**
+```bash
+openclaw security audit
+# Warns if dmPolicy="open" without explicit "*" in allowlist
+```
+
+**OpenClaw Docs:** [Security - DM Access Model](https://docs.openclaw.ai/gateway/security#dm-access-model-pairing--allowlist--open--disabled)
+  </Accordion>
+
+  <Accordion title="OSSASAI-ID-02: Session Isolation by Default" icon="layer-group">
+**OpenClaw Implementation:**
+- `session.dmScope` controls DM session routing
+- Default routes all DMs to main session (single-user mode)
+- Multi-user mode requires explicit isolation setting
+
+**Configuration:**
+```json5
+{
+  session: {
+    dmScope: "per-channel-peer"     // Isolate by channel + peer
+    // Or: "per-account-channel-peer" for multi-account channels
+  }
+}
+```
+
+**Options:**
+| dmScope | Description |
+|---------|-------------|
+| (default) | All DMs route to main session |
+| `per-channel-peer` | Isolate by channel and peer |
+| `per-account-channel-peer` | Isolate by account, channel, and peer (strictest) |
+
+**Verification:**
+```bash
+openclaw security audit
+# Warns when multiple DM senders share main session without isolation
+```
+
+**Evidence:**
+- Configuration snapshot
+- `openclaw security audit` session isolation check
+
+**OpenClaw Docs:** [Security - DM Session Isolation](https://docs.openclaw.ai/gateway/security#dm-session-isolation-multi-user-mode)
+  </Accordion>
+
+  <Accordion title="OSSASAI-ID-03: Group/Channel Policy Hardening" icon="users-rectangle">
+**OpenClaw Implementation:**
+- Group allowlists control which groups the bot responds in
+- `requireMention: true` enables mention gating (only respond when @mentioned)
+- Per-group tool restrictions via `groupPolicy` and `groupAllowFrom`
+
+**Configuration:**
+```json5
+{
+  channels: {
+    whatsapp: {
+      groups: {
+        "*": { requireMention: true }  // Require @mention in all groups
+      }
+    }
+  },
+  agents: {
+    list: [{
+      id: "main",
+      groupChat: {
+        mentionPatterns: ["@openclaw", "@mybot"]
+      }
+    }]
+  }
+}
+```
+
+**Verification:**
+```bash
+openclaw security audit
+# Warns on groupPolicy="open" or missing mention gating
+```
+
+**OpenClaw Docs:** [Security - Allowlists](https://docs.openclaw.ai/gateway/security#allowlists-dm--groups--terminology)
+  </Accordion>
+</AccordionGroup>
+
+### B3 — Tool Governance Controls
+
+<AccordionGroup>
+  <Accordion title="OSSASAI-TB-01: Least Privilege Tool Configuration" icon="minimize">
+**OpenClaw Implementation:**
+- Tool allow/deny lists restrict available capabilities
+- Per-agent tool configuration via `agents.list[].tools`
+- Sandbox workspace access controls (`none`, `ro`, `rw`)
+
+**Configuration:**
+```json5
+{
+  agents: {
+    list: [{
+      id: "family",
+      tools: {
+        allow: ["read"],
+        deny: ["write", "edit", "apply_patch", "exec", "process", "browser"]
+      }
+    }]
+  }
+}
+```
+
+**Verification:**
+```bash
+openclaw sandbox explain
+# Shows effective sandbox mode, tool policy, and config keys
+```
+
+**Evidence:**
+- Tool policy in config
+- `openclaw security audit` tool blast radius check
+
+**OpenClaw Docs:** [Multi-Agent Sandbox & Tools](https://docs.openclaw.ai/multi-agent-sandbox-tools)
+  </Accordion>
+
+  <Accordion title="OSSASAI-TB-02: Approval Gates for High-Risk Actions" icon="check-double">
+**OpenClaw Implementation:**
+- `tools.elevated` provides explicit escape hatch for host exec
+- `tools.elevated.allowFrom` restricts who can use elevated mode
+- Node execution requires pairing + approval + allowlist
+- macOS nodes have Settings → Exec approvals (security/ask/allowlist)
+
+**Configuration:**
+```json5
+{
+  tools: {
+    elevated: {
+      allowFrom: ["+15555550123"]  // Only this sender can use elevated
+    }
+  }
+}
+```
+
+**Node Execution Control:**
+```bash
+# Approval required for nodes.run
+# Configured via node command allowlist + declared commands
+# Approvals are tokenized to prevent replay
+```
+
+**Verification:**
+```bash
+openclaw security audit
+# Checks elevated allowlists and tool blast radius
+```
+
+**OpenClaw Docs:** [Elevated Mode](https://docs.openclaw.ai/tools/elevated)
+  </Accordion>
+
+  <Accordion title="OSSASAI-TB-03: Sandboxing for Untrusted Contexts" icon="box">
+**OpenClaw Implementation:**
+- Docker-based tool sandboxing (optional, recommended)
+- **Modes:** `off`, `non-main` (default for safe chat), `all`
+- **Scopes:** `session` (per-session container), `agent`, `shared`
+- **Workspace access:** `none` (default), `ro`, `rw`
+
+**Configuration:**
+```json5
+{
+  agents: {
+    defaults: {
+      sandbox: {
+        mode: "non-main",           // Sandbox non-main sessions
+        scope: "session",           // One container per session
+        workspaceAccess: "none"     // No agent workspace access
+      }
+    }
+  }
+}
+```
+
+**Setup:**
+```bash
+# Build sandbox image
+scripts/sandbox-setup.sh
+
+# Optional: sandboxed browser
+scripts/sandbox-browser-setup.sh
+```
+
+**Verification:**
+```bash
+openclaw sandbox explain
+# Shows effective sandbox configuration
+```
+
+**OpenClaw Docs:** [Sandboxing](https://docs.openclaw.ai/gateway/sandboxing)
+  </Accordion>
+
+  <Accordion title="OSSASAI-TB-04: Outbound Data Exfiltration Controls" icon="arrow-right-from-bracket">
+**OpenClaw Implementation:**
+- Sandbox containers run with **no network by default**
+- `agents.defaults.sandbox.docker.network` controls egress
+- Tool policy deny lists block network tools
+- Browser control can be restricted via profile isolation
+
+**Configuration:**
+```json5
+{
+  agents: {
+    defaults: {
+      sandbox: {
+        docker: {
+          network: "none"    // No network access (default)
+        }
+      }
+    },
+    list: [{
+      id: "restricted",
+      tools: {
+        deny: ["web_search", "web_fetch", "browser"]
+      }
+    }]
+  }
+}
+```
+
+**Verification:**
+```bash
+openclaw security audit
+# Checks tool blast radius for data exfiltration risk
+```
+
+**OpenClaw Docs:** [Sandboxing - Network](https://docs.openclaw.ai/gateway/sandboxing#images--setup)
+  </Accordion>
+</AccordionGroup>
+
+### B4 — Local State Controls
+
+<AccordionGroup>
+  <Accordion title="OSSASAI-LS-01: Secrets Protected at Rest" icon="key">
+**OpenClaw Implementation:**
+- `~/.openclaw` directory contains all secrets
+- `openclaw security audit --fix` tightens permissions automatically
+- Credentials stored in `credentials/`, `agents/<id>/agent/auth-profiles.json`
+
+**Required Permissions:**
+```bash
+# Auto-fix permissions
+openclaw security audit --fix
+
+# Manual verification
+ls -la ~/.openclaw/
+# Should show:
+# drwx------ (700) ~/.openclaw/
+# -rw------- (600) ~/.openclaw/openclaw.json
+# -rw------- (600) ~/.openclaw/credentials/*.json
+```
+
+**Sensitive Paths:**
+| Path | Contains |
+|------|----------|
+| `~/.openclaw/openclaw.json` | Config with tokens |
+| `~/.openclaw/credentials/` | Channel credentials, pairing allowlists |
+| `~/.openclaw/agents/<id>/agent/auth-profiles.json` | API keys, OAuth tokens |
+| `~/.openclaw/agents/<id>/sessions/*.jsonl` | Session transcripts |
+
+**OpenClaw Docs:** [Security - Secrets on Disk](https://docs.openclaw.ai/gateway/security#07-secrets-on-disk-whats-sensitive)
+  </Accordion>
+
+  <Accordion title="OSSASAI-LS-02: Sensitive Log Redaction" icon="eye-slash">
+**OpenClaw Implementation:**
+- `logging.redactSensitive` controls redaction level
+- Default: `"tools"` (redact tool summaries)
+- Custom patterns via `logging.redactPatterns`
+- `--fix` restores redaction if disabled
+
+**Configuration:**
+```json5
+{
+  logging: {
+    level: "info",
+    redactSensitive: "tools",   // Default - redact tool output
+    redactPatterns: [
+      "your-internal-token-pattern",
+      "internal.company.com"
+    ]
+  }
+}
+```
+
+**Verification:**
+```bash
+openclaw security audit
+# Warns if redactSensitive="off"
+
+# Safe diagnostic export (secrets redacted)
+openclaw status --all
+```
+
+**OpenClaw Docs:** [Security - Logs & Transcripts](https://docs.openclaw.ai/gateway/security#08-logs--transcripts-redaction--retention)
+  </Accordion>
+
+  <Accordion title="OSSASAI-LS-03: Memory Safety Against Instruction Smuggling" icon="brain">
+**OpenClaw Implementation:**
+- Session transcripts isolated per session (when dmScope configured)
+- Sandbox workspace access controls prevent context leakage
+- Model choice matters: prefer instruction-hardened models (Opus 4.5 recommended)
+- Reader agent pattern for untrusted content
+
+**Mitigation Configuration:**
+```json5
+{
+  session: {
+    dmScope: "per-channel-peer"   // Isolate session memory
+  },
+  agents: {
+    defaults: {
+      sandbox: {
+        workspaceAccess: "none"   // No shared workspace
+      }
+    }
+  }
+}
+```
+
+**Best Practices:**
+- Use read-only/tool-disabled reader agent for untrusted content
+- Keep `web_search`/`web_fetch`/`browser` off for tool-enabled agents
+- Keep secrets out of prompts; use env/config on gateway host
+
+**OpenClaw Docs:** [Security - Prompt Injection](https://docs.openclaw.ai/gateway/security#prompt-injection-what-it-is-why-it-matters)
+  </Accordion>
+
+  <Accordion title="OSSASAI-LS-04: Retention and Deletion Guarantees" icon="trash">
+**OpenClaw Implementation:**
+- Session transcripts stored in `~/.openclaw/agents/<id>/sessions/*.jsonl`
+- `/new` or `/reset` slash commands start fresh session
+- Manual pruning of old transcripts recommended
+
+**Session Management:**
+```bash
+# Reset session via message
+/new
+/reset
+
+# Compact session context
+/compact [instructions]
+```
+
+**Session Files:**
+```
+~/.openclaw/agents/<agentId>/sessions/
+├── <SessionId>.jsonl       # Session transcript
+└── sessions.json           # Session metadata
+```
+
+**Retention Best Practices:**
+- Prune old session transcripts if not needed
+- Use full-disk encryption on gateway host
+- Dedicated OS user account for Gateway if host is shared
+
+**OpenClaw Docs:** [Sessions and Memory](https://docs.openclaw.ai/start/openclaw#sessions-and-memory)
+  </Accordion>
+</AccordionGroup>
+
+### Supply Chain Controls
+
+<AccordionGroup>
+  <Accordion title="OSSASAI-SC-01: Explicit Plugin Trust and Inventory" icon="puzzle-piece">
+**OpenClaw Implementation:**
+- Plugins run **in-process** with the Gateway (treat as trusted code)
+- `plugins.allow` provides explicit allowlist
+- npm-installed plugins execute lifecycle scripts during install
+
+**Configuration:**
+```json5
+{
+  plugins: {
+    allow: [
+      "official-plugin",
+      "@scope/verified-plugin"
+    ]
+  }
+}
+```
+
+**Plugin Management:**
+```bash
+# Install plugin (treat as running untrusted code)
+openclaw plugins install <npm-spec>
+
+# Prefer pinned versions
+openclaw plugins install @scope/pkg@1.2.3
+
+# Inspect unpacked code before enabling
+ls ~/.openclaw/extensions/<pluginId>/
+```
+
+**Verification:**
+```bash
+openclaw security audit
+# Warns if extensions exist without explicit allowlist
+```
+
+**OpenClaw Docs:** [Security - Plugins/Extensions](https://docs.openclaw.ai/gateway/security#pluginsextensions)
+  </Accordion>
+
+  <Accordion title="OSSASAI-SC-02: Reproducible Builds and Pinning" icon="thumbtack">
+**OpenClaw Implementation:**
+- Pin exact versions when installing plugins
+- Inspect unpacked code before enabling
+- Plugin install path: `~/.openclaw/extensions/<pluginId>/`
+
+**Best Practices:**
+```bash
+# Pin exact version
+openclaw plugins install @scope/pkg@1.2.3
+
+# Inspect before enabling
+cat ~/.openclaw/extensions/<pluginId>/package.json
+```
+
+**Evidence:**
+- Plugin inventory with pinned versions
+- Code inspection records
+
+**OpenClaw Docs:** [Plugin](https://docs.openclaw.ai/plugin)
+  </Accordion>
+</AccordionGroup>
+
+### Network Security Controls
+
+<AccordionGroup>
+  <Accordion title="OSSASAI-NS-01: TLS Enforcement" icon="lock">
+**OpenClaw Implementation:**
+- Gateway remote connections use WSS (WebSocket Secure)
+- `gateway.remote.tlsFingerprint` enables certificate pinning
+- Tailscale Serve provides TLS termination for HTTPS
+
+**Configuration:**
+```json5
+{
+  gateway: {
+    remote: {
+      url: "wss://gateway-host:18789",
+      token: "<token>",
+      tlsFingerprint: "sha256:..."   // Optional: pin TLS cert
+    }
+  }
+}
+```
+
+**OpenClaw Docs:** [Gateway Remote](https://docs.openclaw.ai/gateway/remote)
+  </Accordion>
+
+  <Accordion title="OSSASAI-NS-02: Certificate Validation" icon="certificate">
+**OpenClaw Implementation:**
+- WSS connections validate certificates by default
+- `tlsFingerprint` provides optional certificate pinning
+- Tailscale identity headers validated via `tailscale whois`
+
+**Configuration:**
+```json5
+{
+  gateway: {
+    auth: {
+      allowTailscale: true   // Trust Tailscale Serve identity headers
+    }
+  }
+}
+```
+
+**Security Rule:** Do not forward Tailscale headers from your own reverse proxy.
+
+**OpenClaw Docs:** [Security - Tailscale Serve](https://docs.openclaw.ai/gateway/security#06-tailscale-serve-identity-headers)
+  </Accordion>
+
+  <Accordion title="OSSASAI-NS-03: API Endpoint Security" icon="server">
+**OpenClaw Implementation:**
+- Gateway multiplexes WebSocket + HTTP on single port
+- Auth required for all WS connections (token/password)
+- Device pairing auto-approved only for local connects
+
+**Configuration:**
+```json5
+{
+  gateway: {
+    auth: {
+      mode: "token",
+      token: "your-token"
+    }
+  }
+}
+```
+
+**OpenClaw Docs:** [Security - Gateway WebSocket](https://docs.openclaw.ai/gateway/security#05-lock-down-the-gateway-websocket-local-auth)
+  </Accordion>
+
+  <Accordion title="OSSASAI-NS-04: mDNS/Bonjour Discovery Security" icon="radar">
+**OpenClaw Implementation:**
+- Gateway broadcasts presence via mDNS for device discovery
+- **Minimal mode (default):** omits sensitive fields (cliPath, sshPort)
+- Full mode exposes operational details (filesystem paths, SSH availability)
+
+**Configuration:**
+```json5
+{
+  discovery: {
+    mdns: {
+      mode: "minimal"    // Default - hide sensitive info
+      // Or: "off" to disable entirely
+      // Or: "full" for debugging (exposes paths)
+    }
+  }
+}
+
+// Or via environment:
+// OPENCLAW_DISABLE_BONJOUR=1
+```
+
+**OpenClaw Docs:** [Security - mDNS/Bonjour](https://docs.openclaw.ai/gateway/security#041-mdnsbonjour-discovery-information-disclosure)
+  </Accordion>
+</AccordionGroup>
+
+### Formal Verification Controls (Optional)
+
+<AccordionGroup>
+  <Accordion title="OSSASAI-FV-01: Security Invariant Formal Verification" icon="microscope">
+**OpenClaw Implementation:**
+- TLA+/TLC models for security-critical paths
+- Models maintained in [openclaw-formal-models](https://github.com/vignesh07/openclaw-formal-models)
+- Covers: gateway exposure, nodes.run pipeline, pairing, ingress gating, session isolation
+
+**Verified Claims:**
+| Model | Claim |
+|-------|-------|
+| `gateway-exposure-v2` | Loopback binding + auth blocks remote compromise |
+| `nodes-pipeline` | nodes.run requires allowlist + approval |
+| `pairing` | Pairing respects TTL and pending caps |
+| `ingress-gating` | Mention gating blocks unauthorized commands |
+| `routing-isolation` | Distinct peers don't collapse sessions |
+
+**Reproduce:**
+```bash
+git clone https://github.com/vignesh07/openclaw-formal-models
+cd openclaw-formal-models
+make gateway-exposure-v2
+make nodes-pipeline
+```
+
+**OpenClaw Docs:** [Formal Verification](https://docs.openclaw.ai/security/formal-verification/)
+  </Accordion>
+
+  <Accordion title="OSSASAI-FV-02: Negative Model Regression Testing" icon="bug">
+**OpenClaw Implementation:**
+- Paired **negative models** that MUST produce counterexamples
+- Ensures detection capability for realistic bug classes
+- Counterexample traces preserved for analysis
+
+**Negative Models:**
+```bash
+# These MUST fail (produce counterexamples)
+make gateway-exposure-v2-negative
+make nodes-pipeline-negative
+make pairing-negative
+make ingress-gating-negative
+make routing-isolation-negative
+```
+
+**OpenClaw Docs:** [Formal Verification - Negative Models](https://docs.openclaw.ai/security/formal-verification/)
+  </Accordion>
+
+  <Accordion title="OSSASAI-FV-03: Continuous Verification in CI/CD" icon="rotate">
+**OpenClaw Implementation:**
+- Models can be run in CI via `make` targets
+- Java 11+ required (TLC runs on JVM)
+- Repo vendors pinned `tla2tools.jar`
+
+**CI Integration Example:**
+```yaml
+- name: Run Formal Verification
+  run: |
+    cd formal-models
+    make gateway-exposure-v2
+    make nodes-pipeline
+    make pairing
+```
+
+**OpenClaw Docs:** [Formal Verification - Reproducing](https://docs.openclaw.ai/security/formal-verification/#reproducing-results)
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Conformance Recipes
+
+### L1 — Local-First Baseline
+
+<Steps>
+  <Step title="Initial Setup">
+```bash
+# Onboard with secure defaults
+openclaw setup
+
+# Start Gateway (loopback only)
+openclaw gateway --port 18789
+```
+  </Step>
+  <Step title="Run Security Audit">
+```bash
+openclaw security audit --deep
+openclaw security audit --fix
+```
+  </Step>
+  <Step title="Verify Configuration">
+```bash
+# Check binding
+netstat -an | grep 18789
+# Should show 127.0.0.1:18789
+
+# Check permissions
+ls -la ~/.openclaw/
+```
+  </Step>
+</Steps>
+
+**L1 Checklist:**
+- [ ] Gateway bound to loopback (`gateway.bind: "loopback"`)
+- [ ] Gateway auth configured (token or password)
+- [ ] DM policy set to `pairing` or `allowlist`
+- [ ] Session isolation configured (`dmScope`)
+- [ ] File permissions correct (700/600)
+- [ ] Log redaction enabled (`redactSensitive: "tools"`)
+
+### L2 — Network-Aware Deployment
+
+<Steps>
+  <Step title="Complete L1">
+Ensure all L1 controls are implemented.
+  </Step>
+  <Step title="Secure Remote Access">
+```bash
+# Prefer Tailscale Serve over LAN binds
+tailscale serve --bg 18789
+
+# Or SSH tunnel
+ssh -L 18789:localhost:18789 user@gateway-host
+```
+  </Step>
+  <Step title="Enable Additional Controls">
+```json5
+{
+  session: { dmScope: "per-channel-peer" },
+  channels: {
+    whatsapp: {
+      groups: { "*": { requireMention: true } }
+    }
+  },
+  agents: {
+    defaults: {
+      sandbox: { mode: "non-main" }
+    }
+  }
+}
+```
+  </Step>
+  <Step title="Run L2 Audit">
+```bash
+openclaw security audit --deep
+```
+  </Step>
+</Steps>
+
+**L2 Checklist (includes L1):**
+- [ ] Trusted proxies configured (if using reverse proxy)
+- [ ] Mention gating enabled for groups
+- [ ] Tool allow/deny lists configured
+- [ ] Sandboxing enabled for non-main sessions
+- [ ] Elevated exec restricted to specific senders
+
+### L3 — High-Assurance Deployment
+
+<Steps>
+  <Step title="Complete L1 + L2">
+Ensure all L1 and L2 controls are implemented.
+  </Step>
+  <Step title="Enable Strict Settings">
+```json5
+{
+  session: { dmScope: "per-account-channel-peer" },
+  agents: {
+    defaults: {
+      sandbox: {
+        mode: "all",
+        scope: "session",
+        workspaceAccess: "none"
+      }
+    }
+  },
+  discovery: { mdns: { mode: "off" } }
+}
+```
+  </Step>
+  <Step title="Run Formal Verification">
+```bash
+git clone https://github.com/vignesh07/openclaw-formal-models
+cd openclaw-formal-models
+make all
+```
+  </Step>
+</Steps>
+
+**L3 Checklist (includes L1 + L2):**
+- [ ] Strictest session isolation (`per-account-channel-peer`)
+- [ ] All sessions sandboxed (`mode: "all"`)
+- [ ] No workspace access from sandbox (`workspaceAccess: "none"`)
+- [ ] mDNS discovery disabled
+- [ ] Formal verification models pass
+- [ ] Negative models produce expected counterexamples
+
+---
+
+## Evidence Generation
+
+```bash
+# Create evidence directory
+mkdir -p evidence
+
+# Full security audit
+openclaw security audit --deep 2>&1 | tee evidence/audit-report.txt
+
+# Safe diagnostic (secrets redacted)
+openclaw status --all > evidence/status-redacted.txt
+
+# Permission check
+ls -la ~/.openclaw/ > evidence/permissions.txt
+stat -c "%a %n" ~/.openclaw/* >> evidence/permissions.txt
+
+# Sandbox configuration
+openclaw sandbox explain > evidence/sandbox-config.txt
+```
+
+---
+
+## Incident Response
+
+If you suspect compromise:
+
+### 1. Contain
+```bash
+# Stop the Gateway
+pkill -f "openclaw gateway"
+
+# Or stop macOS app if it supervises Gateway
+# Lock down inbound surfaces
+```
+
+### 2. Rotate
+```bash
+# Rotate Gateway auth
+openclaw doctor --generate-gateway-token
+# Update config, restart Gateway
+
+# Rotate provider credentials
+# Revoke/rotate API keys in auth-profiles.json
+```
+
+### 3. Audit
+```bash
+# Check logs
+tail -100 /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log
+
+# Review recent transcripts
+ls -lt ~/.openclaw/agents/*/sessions/*.jsonl | head -10
+```
+
+**OpenClaw Docs:** [Security - Incident Response](https://docs.openclaw.ai/gateway/security#incident-response)
+
+---
+
+## Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 0.1.0 | January 2025 | Initial release aligned with OSSASAI v0.1.0 and OpenClaw security model |
+
+## References
+
+- [OpenClaw Security Guide](https://docs.openclaw.ai/gateway/security)
+- [OpenClaw Sandboxing](https://docs.openclaw.ai/gateway/sandboxing)
+- [OpenClaw Formal Verification](https://docs.openclaw.ai/security/formal-verification/)
+- [OSSASAI Specification](/spec/overview)

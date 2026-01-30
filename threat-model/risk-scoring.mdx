@@ -1,0 +1,474 @@
+---
+title: 'Risk Scoring'
+description: 'Blast Radius framework for quantifying attack impact'
+---
+
+## Overview
+
+The OSSASAI Blast Radius framework provides a quantitative method for assessing the potential impact of security threats. This enables organizations to prioritize controls based on risk rather than compliance checklists alone.
+
+## Blast Radius Concept
+
+The "blast radius" represents the extent of damage that could result from a successful attack. A larger blast radius indicates more severe potential consequences.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Blast Radius Visualization                      │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│                    Minimal Blast Radius                              │
+│                           ●                                          │
+│                          ●●●                                         │
+│                      Single file affected                            │
+│                                                                      │
+│                    Medium Blast Radius                               │
+│                         ●●●●●                                        │
+│                        ●●●●●●●                                       │
+│                       ●●●●●●●●●                                      │
+│                    Project directory affected                        │
+│                                                                      │
+│                    Large Blast Radius                                │
+│                      ●●●●●●●●●●●●●                                   │
+│                     ●●●●●●●●●●●●●●●                                  │
+│                    ●●●●●●●●●●●●●●●●●                                 │
+│                   ●●●●●●●●●●●●●●●●●●●                                │
+│                    User home directory affected                      │
+│                                                                      │
+│                    Maximum Blast Radius                              │
+│                 ●●●●●●●●●●●●●●●●●●●●●●●●●                            │
+│                ●●●●●●●●●●●●●●●●●●●●●●●●●●●                           │
+│               ●●●●●●●●●●●●●●●●●●●●●●●●●●●●●                          │
+│              ●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●                         │
+│               Entire system or network affected                      │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+## Risk Calculation Formula
+
+### Core Formula
+
+```
+Risk Score = Likelihood × Impact × (1 - Mitigation Factor)
+
+Where:
+  Risk Score ∈ [0, 10]
+  Likelihood ∈ [0, 1]
+  Impact ∈ [0, 10]
+  Mitigation Factor ∈ [0, 1]
+```
+
+### Component Calculations
+
+<Tabs>
+  <Tab title="Likelihood">
+    ```
+    Likelihood = (AC + AR + AV) / 3
+
+    Where:
+      AC = Adversary Capability (0-1)
+      AR = Access Required (0-1)
+      AV = Attack Complexity (inverse, 0-1)
+    ```
+
+    | Factor | Low (0.1-0.3) | Medium (0.4-0.6) | High (0.7-1.0) |
+    |--------|---------------|------------------|----------------|
+    | Adversary Capability | Script kiddie | Motivated individual | Nation state |
+    | Access Required | Network only | Authenticated user | Physical/Admin |
+    | Attack Complexity | Trivial | Moderate | Highly complex |
+  </Tab>
+  <Tab title="Impact (Blast Radius)">
+    ```
+    Impact = (C + I + A + S) / 4 × Scope Multiplier
+
+    Where:
+      C = Confidentiality Impact (0-10)
+      I = Integrity Impact (0-10)
+      A = Availability Impact (0-10)
+      S = Scope Impact (0-10)
+      Scope Multiplier = 1.0 to 1.5 based on boundary crossing
+    ```
+
+    | Factor | Low (1-3) | Medium (4-6) | High (7-10) |
+    |--------|-----------|--------------|-------------|
+    | Confidentiality | Non-sensitive data | Internal data | Secrets/PII |
+    | Integrity | Reversible changes | Code modifications | Persistent backdoor |
+    | Availability | Temporary disruption | Service outage | Data loss |
+    | Scope | Single file | Project | System/Network |
+  </Tab>
+  <Tab title="Mitigation Factor">
+    ```
+    Mitigation Factor = Σ(Control Effectiveness × Control Weight) / Σ(Control Weight)
+
+    Where:
+      Control Effectiveness = 0 (not implemented) to 1 (fully effective)
+      Control Weight = Control priority for this threat
+    ```
+
+    Example calculation:
+    | Control | Effectiveness | Weight | Contribution |
+    |---------|---------------|--------|--------------|
+    | TB-01 | 0.9 | 1.0 | 0.90 |
+    | TB-02 | 0.8 | 0.8 | 0.64 |
+    | LS-01 | 0.7 | 0.6 | 0.42 |
+    | **Total** | | 2.4 | 1.96 / 2.4 = **0.82** |
+  </Tab>
+</Tabs>
+
+## Blast Radius Components
+
+### Filesystem Scope (FS)
+
+| Score | Scope | Description |
+|-------|-------|-------------|
+| 1 | Single File | Only one specific file affected |
+| 3 | Single Directory | One directory and its contents |
+| 5 | Project Tree | Entire project directory |
+| 7 | Home Directory | User's home directory |
+| 9 | System | Entire system accessible |
+| 10 | Network | Other systems reachable |
+
+### Capability Scope (CS)
+
+| Score | Capabilities | Description |
+|-------|--------------|-------------|
+| 1 | Read Only | Can only read files |
+| 3 | Read + Limited Write | Can write to specific locations |
+| 5 | Full Filesystem | Full read/write access |
+| 7 | Shell Execution | Can execute shell commands |
+| 9 | Network + Shell | Full shell plus network access |
+| 10 | Privileged | Root/admin capabilities |
+
+### Data Sensitivity (DS)
+
+| Score | Data Type | Description |
+|-------|-----------|-------------|
+| 1 | Public | Already public information |
+| 3 | Internal | Internal documentation |
+| 5 | Confidential | Proprietary code, business logic |
+| 7 | Restricted | API keys, tokens |
+| 9 | Secret | Credentials, private keys |
+| 10 | Highly Restricted | Production secrets, HSM keys |
+
+### Persistence Potential (PP)
+
+| Score | Persistence | Description |
+|-------|-------------|-------------|
+| 1 | None | Attack has no lasting effect |
+| 3 | Session | Persists for session duration |
+| 5 | Configuration | Survives restarts via config |
+| 7 | Code | Embedded in codebase |
+| 9 | System | Survives reinstallation |
+| 10 | Hardware | Firmware/hardware level |
+
+## Impact Calculation
+
+### Combined Blast Radius Score
+
+```
+Blast Radius Score = (FS + CS + DS + PP) / 4
+
+Example:
+  FS = 5 (Project Tree)
+  CS = 7 (Shell Execution)
+  DS = 7 (Restricted - API keys accessible)
+  PP = 5 (Configuration persistence)
+
+  Blast Radius = (5 + 7 + 7 + 5) / 4 = 6.0
+```
+
+### Impact Categories
+
+| Blast Radius | Category | Description |
+|--------------|----------|-------------|
+| 1.0 - 2.9 | Minimal | Limited to non-sensitive single files |
+| 3.0 - 4.9 | Low | Project scope, reversible changes |
+| 5.0 - 6.9 | Medium | Significant data exposure or modification |
+| 7.0 - 8.9 | High | Credential exposure, system compromise |
+| 9.0 - 10.0 | Critical | Full system/network compromise |
+
+## Risk Level Determination
+
+### Risk Matrix
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Risk Matrix                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│         │ Low       Medium      High        Critical                 │
+│         │ Impact    Impact      Impact      Impact                   │
+│ ────────┼────────────────────────────────────────────                │
+│ High    │ Medium    High        Critical    Critical                 │
+│ Likelih │ (3-4)     (5-6)       (7-8)       (9-10)                   │
+│ ────────┼────────────────────────────────────────────                │
+│ Medium  │ Low       Medium      High        Critical                 │
+│ Likelih │ (2-3)     (3-5)       (5-7)       (7-9)                    │
+│ ────────┼────────────────────────────────────────────                │
+│ Low     │ Low       Low         Medium      High                     │
+│ Likelih │ (1-2)     (2-3)       (3-5)       (5-7)                    │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Risk Level Actions
+
+| Risk Level | Score Range | Required Action |
+|------------|-------------|-----------------|
+| Low | 0.0 - 2.9 | Monitor, address in regular maintenance |
+| Medium | 3.0 - 5.9 | Plan remediation within normal cycles |
+| High | 6.0 - 7.9 | Prioritize remediation, implement compensating controls |
+| Critical | 8.0 - 10.0 | Immediate action required |
+
+## Example Risk Calculations
+
+### Example 1: Prompt Injection with Shell Access
+
+<Accordion title="Calculation Details">
+**Scenario**: Attacker achieves prompt injection that executes shell commands
+
+**Likelihood Calculation**:
+- Adversary Capability: 0.5 (Motivated Individual)
+- Access Required: 0.7 (Authenticated user access)
+- Attack Complexity: 0.6 (Moderate complexity, inverse)
+
+```
+Likelihood = (0.5 + 0.7 + 0.6) / 3 = 0.6
+```
+
+**Impact Calculation**:
+- Filesystem Scope: 5 (Project tree)
+- Capability Scope: 7 (Shell execution)
+- Data Sensitivity: 7 (API keys in env files)
+- Persistence Potential: 3 (Session only)
+
+```
+Impact = (5 + 7 + 7 + 3) / 4 = 5.5
+```
+
+**Mitigation Factor**:
+- TB-02 (Command Restrictions): 0.7 effectiveness
+- ID-01 (Authentication): 0.9 effectiveness
+- TB-01 (Sandboxing): 0.5 effectiveness
+
+```
+Mitigation = (0.7×1.0 + 0.9×0.8 + 0.5×0.6) / 2.4 = 0.70
+```
+
+**Final Risk Score**:
+```
+Risk = 0.6 × 5.5 × (1 - 0.70) = 0.99
+Risk Level: Low (mitigated effectively)
+```
+</Accordion>
+
+### Example 2: Supply Chain Plugin Compromise
+
+<Accordion title="Calculation Details">
+**Scenario**: Malicious plugin installed with full permissions
+
+**Likelihood Calculation**:
+- Adversary Capability: 0.7 (Organized crime)
+- Access Required: 0.3 (User installs plugin)
+- Attack Complexity: 0.4 (Requires plugin adoption)
+
+```
+Likelihood = (0.7 + 0.3 + 0.4) / 3 = 0.47
+```
+
+**Impact Calculation**:
+- Filesystem Scope: 7 (Home directory)
+- Capability Scope: 9 (Network + shell)
+- Data Sensitivity: 9 (Credentials)
+- Persistence Potential: 7 (Code embedded)
+
+```
+Impact = (7 + 9 + 9 + 7) / 4 = 8.0
+```
+
+**Mitigation Factor** (if no supply chain controls):
+- SC-01 (Plugin verification): 0.0 effectiveness
+- SC-02 (Dependency checking): 0.0 effectiveness
+
+```
+Mitigation = 0.0
+```
+
+**Final Risk Score**:
+```
+Risk = 0.47 × 8.0 × (1 - 0.0) = 3.76
+Risk Level: Medium (without controls)
+```
+
+**With Controls Implemented**:
+- SC-01: 0.8 effectiveness
+- SC-02: 0.7 effectiveness
+
+```
+Mitigation = (0.8×1.0 + 0.7×0.8) / 1.8 = 0.76
+Risk = 0.47 × 8.0 × (1 - 0.76) = 0.90
+Risk Level: Low (with controls)
+```
+</Accordion>
+
+### Example 3: Credential Exfiltration via Network
+
+<Accordion title="Calculation Details">
+**Scenario**: Agent reads credentials and transmits to external server
+
+**Likelihood Calculation**:
+- Adversary Capability: 0.6 (Skilled attacker)
+- Access Required: 0.6 (User interaction required)
+- Attack Complexity: 0.5 (Moderate)
+
+```
+Likelihood = (0.6 + 0.6 + 0.5) / 3 = 0.57
+```
+
+**Impact Calculation**:
+- Filesystem Scope: 3 (Targeted files)
+- Capability Scope: 5 (Network access)
+- Data Sensitivity: 9 (Credentials)
+- Persistence Potential: 1 (One-time theft)
+
+```
+Impact = (3 + 5 + 9 + 1) / 4 = 4.5
+```
+
+**Mitigation Assessment**:
+| Control | Implemented | Effectiveness |
+|---------|-------------|---------------|
+| LS-02 (Sensitive file protection) | Yes | 0.8 |
+| NS-04 (Traffic analysis) | Yes | 0.7 |
+| TB-01 (Sandboxing) | Partial | 0.4 |
+
+```
+Mitigation = (0.8×1.0 + 0.7×0.9 + 0.4×0.7) / 2.6 = 0.66
+```
+
+**Final Risk Score**:
+```
+Risk = 0.57 × 4.5 × (1 - 0.66) = 0.87
+Risk Level: Low (effectively mitigated)
+```
+</Accordion>
+
+## Risk Assessment Template
+
+```yaml
+# OSSASAI Risk Assessment
+threat:
+  id: "AATT-E1"
+  name: "Data Exfiltration"
+  description: "Agent reads and transmits sensitive files"
+
+likelihood:
+  adversary_capability: 0.6
+  access_required: 0.6
+  attack_complexity: 0.5
+  calculated: 0.57
+
+impact:
+  filesystem_scope: 3
+  capability_scope: 5
+  data_sensitivity: 9
+  persistence_potential: 1
+  calculated: 4.5
+
+mitigations:
+  - control_id: "LS-02"
+    effectiveness: 0.8
+    weight: 1.0
+  - control_id: "NS-04"
+    effectiveness: 0.7
+    weight: 0.9
+  - control_id: "TB-01"
+    effectiveness: 0.4
+    weight: 0.7
+  calculated_factor: 0.66
+
+risk:
+  raw_score: 2.57  # Without mitigations
+  mitigated_score: 0.87
+  level: "Low"
+  trend: "Stable"
+
+recommendations:
+  - "Improve TB-01 sandboxing effectiveness"
+  - "Monitor for exfiltration patterns"
+```
+
+## Automated Risk Scoring
+
+### Using the Audit Tool
+
+```bash
+# Calculate risk scores for all AATT threats
+./ossasai-audit.sh --risk-assessment --output risk-report.json
+
+# Calculate risk for specific threat
+./ossasai-audit.sh --threat AATT-E1 --calculate-risk
+```
+
+### Risk Report Output
+
+```json
+{
+  "assessment_date": "2025-01-15",
+  "target_level": "L2",
+  "risk_summary": {
+    "critical": 0,
+    "high": 2,
+    "medium": 5,
+    "low": 14
+  },
+  "top_risks": [
+    {
+      "threat": "AATT-S1",
+      "name": "Malicious Plugin",
+      "raw_score": 5.2,
+      "mitigated_score": 3.1,
+      "level": "Medium",
+      "primary_gap": "SC-03 not implemented"
+    },
+    {
+      "threat": "AATT-E1",
+      "name": "Data Exfiltration",
+      "raw_score": 4.8,
+      "mitigated_score": 2.9,
+      "level": "Low",
+      "controls_effective": true
+    }
+  ],
+  "recommendations": [
+    "Implement SC-03 to reduce supply chain risks",
+    "Enhance NS-04 monitoring for exfiltration detection"
+  ]
+}
+```
+
+## Continuous Risk Monitoring
+
+### Key Risk Indicators (KRIs)
+
+| Indicator | Threshold | Action |
+|-----------|-----------|--------|
+| New critical risk | Any | Immediate review |
+| Risk score increase > 20% | Weekly | Investigation required |
+| Mitigation effectiveness drop | < 0.5 | Control review |
+| New unmitigated threat | Any | Risk assessment |
+
+### Risk Trending
+
+Track risk over time to identify patterns:
+
+```
+Risk Trend (30 days)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Critical ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  0
+High     ▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░  2 (↓1)
+Medium   ▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░  5 (stable)
+Low      ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░  14 (↑2)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Overall Risk Posture: Improving ↑
+```

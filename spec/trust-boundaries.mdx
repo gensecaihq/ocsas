@@ -1,0 +1,553 @@
+---
+title: 'Trust Boundaries'
+description: 'Formal definitions of B1-B4 canonical trust boundaries and security implications'
+---
+
+## Abstract
+
+Trust boundaries represent security-relevant interfaces where data, control, or identity cross between domains with different trust assumptions. OSSASAI defines four canonical trust boundaries (B1–B4) that form the foundation for control mapping, threat analysis, and verification procedures. This document provides formal definitions, threat surface analysis, and implementation guidance for each boundary.
+
+<Note>
+**Security Engineering Principle:** Trust boundaries are derived from the principle that security controls must be placed where trust assumptions change. Effective boundary protection requires understanding what crosses the boundary, in which direction, and under what conditions (Saltzer & Schroeder, 1975).
+</Note>
+
+## Canonical Trust Boundary Model
+
+OSSASAI's trust boundary model is derived from threat modeling methodologies including STRIDE (Microsoft SDL) and attack surface analysis (Manadhata & Wing, 2011).
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                      OSSASAI Canonical Trust Boundary Model                      │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│   ┌─────────────────────────────────────────────────────────────────────────┐   │
+│   │                     B1 — INBOUND IDENTITY BOUNDARY                       │   │
+│   │                                                                          │   │
+│   │   External World ──────────────────────────────────────► Agent Runtime   │   │
+│   │                                                                          │   │
+│   │   Crosses: User messages, channel inputs, web data, API responses       │   │
+│   │   Function: Peer verification, input validation, coercion resistance    │   │
+│   │   Threats: Prompt injection, social engineering, impersonation          │   │
+│   └─────────────────────────────────────────────────────────────────────────┘   │
+│                                          │                                       │
+│                                          ▼                                       │
+│   ┌─────────────────────────────────────────────────────────────────────────┐   │
+│   │                     B2 — CONTROL PLANE BOUNDARY                          │   │
+│   │                                                                          │   │
+│   │   Operator ◄─────────────────────────────────────────► Agent Config      │   │
+│   │                                                                          │   │
+│   │   Crosses: Configuration, credentials, approvals, administrative cmds   │   │
+│   │   Function: Authentication, authorization, exposure control             │   │
+│   │   Threats: Config tampering, admin bypass, credential theft             │   │
+│   └─────────────────────────────────────────────────────────────────────────┘   │
+│                                          │                                       │
+│                                          ▼                                       │
+│   ┌─────────────────────────────────────────────────────────────────────────┐   │
+│   │                        B3 — TOOL BOUNDARY                                │   │
+│   │                                                                          │   │
+│   │   Agent Runtime ◄────────────────────────────────────► External Systems  │   │
+│   │                                                                          │   │
+│   │   Crosses: Tool invocations, file operations, commands, API calls       │   │
+│   │   Function: Least privilege, sandboxing, approval gates, egress ctrl    │   │
+│   │   Threats: Tool abuse, privilege escalation, data exfiltration          │   │
+│   └─────────────────────────────────────────────────────────────────────────┘   │
+│                                          │                                       │
+│                                          ▼                                       │
+│   ┌─────────────────────────────────────────────────────────────────────────┐   │
+│   │                      B4 — LOCAL STATE BOUNDARY                           │   │
+│   │                                                                          │   │
+│   │   Agent Runtime ◄────────────────────────────────────► Persistent Store  │   │
+│   │                                                                          │   │
+│   │   Crosses: Credentials, logs, memory, transcripts, caches, backups      │   │
+│   │   Function: Secrets protection, redaction, retention, memory safety     │   │
+│   │   Threats: Secret theft, log injection, memory poisoning                │   │
+│   └─────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Boundary Interdependencies
+
+Trust boundaries exhibit directional relationships and failure propagation paths:
+
+| Boundary | Depends On | Protects | Failure Propagation |
+|----------|------------|----------|---------------------|
+| B1 | B2 (config) | B3, B4 | B1 failure → B3/B4 compromise |
+| B2 | OS Security | B1, B3, B4 | B2 failure → complete compromise |
+| B3 | B1 (input), B2 (config) | B4, External | B3 failure → data loss/exfil |
+| B4 | B2 (config), B3 (access) | Credentials, Data | B4 failure → credential theft |
+
+---
+
+## B1: Inbound Identity Boundary
+
+### Formal Definition
+
+**B1** delineates the interface between external entities (peers, channels, web sources) and the agent runtime. B1 controls what information enters the agent's processing context and validates the identity and trustworthiness of message sources.
+
+### Threat Surface Analysis
+
+| Attack Vector | STRIDE Category | AATT Classification | Risk Level |
+|---------------|-----------------|---------------------|------------|
+| Prompt Injection | Tampering, Elevation | Coercion-Direct | Critical |
+| Indirect Prompt Injection | Tampering | Coercion-Indirect | Critical |
+| Peer Impersonation | Spoofing | Context-Identity | High |
+| Channel Confusion | Spoofing | Context-Channel | High |
+| Social Engineering | Spoofing | Coercion-Social | Medium |
+| Input Overflow | Denial of Service | Availability | Medium |
+
+*References: Greshake et al. (2023), Perez & Ribeiro (2022)*
+
+### Security Properties
+
+B1 enforcement MUST ensure the following security properties:
+
+<AccordionGroup>
+  <Accordion title="P1.1: Peer Verification" icon="user-check">
+**Property:** The agent MUST NOT process messages from unverified peers without explicit operator approval.
+
+**Rationale:** Unverified peers represent the primary vector for coercion attacks. Verification establishes baseline identity assurance.
+
+**Verification:** Test that new peer messages trigger verification workflow before processing.
+
+**Related Controls:** OSSASAI-ID-01
+  </Accordion>
+
+  <Accordion title="P1.2: Session Isolation" icon="layer-group">
+**Property:** State and context from one session MUST NOT leak to another session.
+
+**Rationale:** Session boundary collapse enables cross-user attacks and instruction carryover. Isolation prevents context contamination.
+
+**Verification:** Test that session A state is not accessible from session B.
+
+**Related Controls:** OSSASAI-ID-02
+  </Accordion>
+
+  <Accordion title="P1.3: Input Sanitization" icon="broom">
+**Property:** User inputs MUST be processed in a manner that prevents them from being interpreted as system instructions.
+
+**Rationale:** Prompt injection exploits the conflation of instructions and data. Sanitization and separation mitigate this risk.
+
+**Verification:** Test known prompt injection patterns and verify they do not alter agent behavior.
+
+**Related Controls:** OSSASAI-ID-02, OSSASAI-TB-01
+  </Accordion>
+
+  <Accordion title="P1.4: Channel Policy Enforcement" icon="users-rectangle">
+**Property:** Different channel types (DM, group, public) MUST enforce appropriate capability restrictions.
+
+**Rationale:** Group contexts have higher coercion risk due to multiple potential attackers. Restricted capabilities limit blast radius.
+
+**Verification:** Verify that group channels restrict sensitive tool access.
+
+**Related Controls:** OSSASAI-ID-03
+  </Accordion>
+</AccordionGroup>
+
+### Control Mapping
+
+| OSSASAI Control | Boundary Role | Security Property |
+|-----------------|---------------|-------------------|
+| OSSASAI-ID-01 | Primary | Peer verification (P1.1) |
+| OSSASAI-ID-02 | Primary | Session isolation (P1.2) |
+| OSSASAI-ID-03 | Primary | Channel policy (P1.4) |
+| OSSASAI-TB-01 | Secondary | Input-derived command restriction |
+| OSSASAI-LS-03 | Secondary | Memory safety against smuggling |
+
+---
+
+## B2: Control Plane Boundary
+
+### Formal Definition
+
+**B2** delineates the interface between authorized operators and the agent's configuration, credentials, and administrative functions. B2 controls who can modify agent behavior and under what conditions.
+
+### Threat Surface Analysis
+
+| Attack Vector | STRIDE Category | AATT Classification | Risk Level |
+|---------------|-----------------|---------------------|------------|
+| Admin Interface Exposure | Information Disclosure | Capability-Access | Critical |
+| Authentication Bypass | Spoofing | Capability-Escalation | Critical |
+| Configuration Tampering | Tampering | Capability-Config | High |
+| Credential Theft | Information Disclosure | Context-Credential | High |
+| Proxy Spoofing (XFF) | Spoofing | Capability-Access | Medium |
+| Privilege Escalation | Elevation | Capability-Escalation | High |
+
+### Security Properties
+
+B2 enforcement MUST ensure the following security properties:
+
+<AccordionGroup>
+  <Accordion title="P2.1: Default-Deny Exposure" icon="shield">
+**Property:** Administrative interfaces MUST NOT be accessible from untrusted networks by default.
+
+**Rationale:** Control plane exposure is the #3 failure mode in OSSASAI Top 10. Default-deny prevents accidental public exposure.
+
+**Verification:** Verify default bind address is loopback (127.0.0.1) or equivalent.
+
+**Related Controls:** OSSASAI-CP-01
+  </Accordion>
+
+  <Accordion title="P2.2: Strong Authentication" icon="lock">
+**Property:** All administrative operations MUST require authentication with cryptographically secure credentials.
+
+**Rationale:** Weak or default credentials enable trivial administrative compromise.
+
+**Verification:** Verify authentication is required and uses secure mechanisms (token, mTLS, SSO).
+
+**Related Controls:** OSSASAI-CP-02
+  </Accordion>
+
+  <Accordion title="P2.3: Proxy Trust Verification" icon="server">
+**Property:** When operating behind proxies, implementations MUST validate trusted proxy sources before honoring forwarded headers.
+
+**Rationale:** Untrusted proxies can spoof client identity via X-Forwarded-For and similar headers.
+
+**Verification:** Verify trusted proxy configuration and header validation.
+
+**Related Controls:** OSSASAI-CP-03
+  </Accordion>
+
+  <Accordion title="P2.4: Identity Separation" icon="users">
+**Property:** Operator credentials MUST be distinct from agent runtime credentials.
+
+**Rationale:** Separation limits blast radius of credential compromise and enables principle of least privilege.
+
+**Verification:** Verify distinct credential stores for operator and agent identities.
+
+**Related Controls:** OSSASAI-CP-04
+  </Accordion>
+</AccordionGroup>
+
+### Control Mapping
+
+| OSSASAI Control | Boundary Role | Security Property |
+|-----------------|---------------|-------------------|
+| OSSASAI-CP-01 | Primary | Default-deny exposure (P2.1) |
+| OSSASAI-CP-02 | Primary | Strong authentication (P2.2) |
+| OSSASAI-CP-03 | Primary | Proxy trust (P2.3) |
+| OSSASAI-CP-04 | Primary | Identity separation (P2.4) |
+| OSSASAI-LS-01 | Secondary | Credential storage protection |
+
+---
+
+## B3: Tool Boundary
+
+### Formal Definition
+
+**B3** delineates the interface between the agent runtime and external systems accessed via tools (filesystem, shell, network, APIs, databases). B3 controls what actions the agent can perform and their scope.
+
+### Threat Surface Analysis
+
+| Attack Vector | STRIDE Category | AATT Classification | Risk Level |
+|---------------|-----------------|---------------------|------------|
+| Unrestricted Tool Invocation | Elevation | Capability-Tool | Critical |
+| Privilege Over-Granting | Elevation | Capability-Escalation | Critical |
+| Data Exfiltration via Tools | Information Disclosure | Capability-Exfil | High |
+| Command Injection | Tampering | Capability-Injection | High |
+| SSRF-like Patterns | Spoofing | Capability-Network | High |
+| Resource Exhaustion | Denial of Service | Availability | Medium |
+
+*Reference: OWASP Top 10 for LLM Applications (2023) - LLM01, LLM07*
+
+### Security Properties
+
+B3 enforcement MUST ensure the following security properties:
+
+<AccordionGroup>
+  <Accordion title="P3.1: Least Privilege Configuration" icon="minimize">
+**Property:** Tools MUST be configured with the minimum capabilities necessary for intended functionality.
+
+**Rationale:** Over-privileged tools amplify the impact of successful coercion attacks (OSSASAI Top 10 #2).
+
+**Verification:** Audit tool configurations and verify scope restrictions.
+
+**Related Controls:** OSSASAI-TB-01
+  </Accordion>
+
+  <Accordion title="P3.2: Human Approval Gates" icon="check-double">
+**Property:** High-risk actions MUST require explicit human approval before execution.
+
+**Rationale:** Human-in-the-loop for sensitive operations provides a critical safety valve against coercion.
+
+**Verification:** Test that designated high-risk operations trigger approval workflow.
+
+**Related Controls:** OSSASAI-TB-02
+  </Accordion>
+
+  <Accordion title="P3.3: Execution Sandboxing" icon="box">
+**Property:** Untrusted contexts MUST execute in sandboxed environments with restricted capabilities.
+
+**Rationale:** Sandboxing provides defense-in-depth against tool abuse and limits lateral movement.
+
+**Verification:** Verify sandbox enforcement for group/public contexts.
+
+**Related Controls:** OSSASAI-TB-03
+  </Accordion>
+
+  <Accordion title="P3.4: Egress Control" icon="arrow-right-from-bracket">
+**Property:** Outbound network access from tools MUST be restricted to allowlisted destinations.
+
+**Rationale:** Unrestricted egress enables data exfiltration and C2 channel establishment.
+
+**Verification:** Test that non-allowlisted destinations are blocked.
+
+**Related Controls:** OSSASAI-TB-04
+  </Accordion>
+</AccordionGroup>
+
+### Control Mapping
+
+| OSSASAI Control | Boundary Role | Security Property |
+|-----------------|---------------|-------------------|
+| OSSASAI-TB-01 | Primary | Least privilege (P3.1) |
+| OSSASAI-TB-02 | Primary | Approval gates (P3.2) |
+| OSSASAI-TB-03 | Primary | Sandboxing (P3.3) |
+| OSSASAI-TB-04 | Primary | Egress control (P3.4) |
+| OSSASAI-SC-01 | Secondary | Plugin/extension trust |
+| OSSASAI-SC-02 | Secondary | Supply chain integrity |
+
+### Blast Radius Analysis
+
+The blast radius of a B3 compromise is a function of tool capabilities:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       B3 Blast Radius Model                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Blast_Radius = Σ(Capability_Score × Scope_Factor × Reversibility_Factor)   │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ LOW BLAST RADIUS                                                       │ │
+│  │ • Filesystem: Read-only, single directory                              │ │
+│  │ • Network: Blocked or read-only APIs                                   │ │
+│  │ • Commands: None or allowlisted read-only                              │ │
+│  │ • Score: < 10                                                          │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ MEDIUM BLAST RADIUS                                                    │ │
+│  │ • Filesystem: Read/write in project scope                              │ │
+│  │ • Network: Allowlisted external APIs                                   │ │
+│  │ • Commands: Allowlisted with approval                                  │ │
+│  │ • Score: 10-50                                                         │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ HIGH BLAST RADIUS                                                      │ │
+│  │ • Filesystem: User home or system access                               │ │
+│  │ • Network: Unrestricted egress                                         │ │
+│  │ • Commands: Shell execution without restriction                        │ │
+│  │ • Score: > 50                                                          │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## B4: Local State Boundary
+
+### Formal Definition
+
+**B4** delineates the interface between the agent runtime and persistent local storage including credentials, logs, memory/context, transcripts, caches, and backup systems. B4 controls how sensitive data is protected at rest.
+
+### Threat Surface Analysis
+
+| Attack Vector | STRIDE Category | AATT Classification | Risk Level |
+|---------------|-----------------|---------------------|------------|
+| Credential Theft from Storage | Information Disclosure | Context-Credential | Critical |
+| Log-based Secret Leakage | Information Disclosure | Context-Logs | High |
+| Memory/RAG Poisoning | Tampering | Context-Memory | High |
+| Transcript Mining | Information Disclosure | Context-History | Medium |
+| Cache-based Inference | Information Disclosure | Context-Cache | Medium |
+| Backup Exposure | Information Disclosure | Context-Backup | Medium |
+
+### Security Properties
+
+B4 enforcement MUST ensure the following security properties:
+
+<AccordionGroup>
+  <Accordion title="P4.1: Secrets Protection at Rest" icon="key">
+**Property:** Credentials and secrets MUST be protected with appropriate access controls and encryption.
+
+**Rationale:** Unprotected credential storage enables trivial theft by any process with filesystem access.
+
+**Verification:** Verify file permissions (600/700) and encryption where applicable.
+
+**Related Controls:** OSSASAI-LS-01
+  </Accordion>
+
+  <Accordion title="P4.2: Sensitive Log Redaction" icon="eye-slash">
+**Property:** Logs MUST NOT contain cleartext secrets, credentials, or other sensitive values.
+
+**Rationale:** Logs are frequently exposed via monitoring systems, backups, and incident investigation. Redaction prevents cascade exposure.
+
+**Verification:** Review logs for sensitive patterns; verify redaction configuration.
+
+**Related Controls:** OSSASAI-LS-02
+  </Accordion>
+
+  <Accordion title="P4.3: Memory Safety" icon="brain">
+**Property:** Memory and RAG retrieval systems MUST prevent instruction smuggling via stored content.
+
+**Rationale:** Poisoned memory enables persistent coercion without direct prompt injection.
+
+**Verification:** Test that retrieved content cannot override system instructions.
+
+**Related Controls:** OSSASAI-LS-03
+  </Accordion>
+
+  <Accordion title="P4.4: Retention and Deletion" icon="trash">
+**Property:** Data retention MUST follow defined policies with secure deletion guarantees.
+
+**Rationale:** Excessive retention increases exposure risk; incomplete deletion leaves recoverable data.
+
+**Verification:** Verify retention policy enforcement and deletion procedures.
+
+**Related Controls:** OSSASAI-LS-04
+  </Accordion>
+</AccordionGroup>
+
+### Control Mapping
+
+| OSSASAI Control | Boundary Role | Security Property |
+|-----------------|---------------|-------------------|
+| OSSASAI-LS-01 | Primary | Secrets protection (P4.1) |
+| OSSASAI-LS-02 | Primary | Log redaction (P4.2) |
+| OSSASAI-LS-03 | Primary | Memory safety (P4.3) |
+| OSSASAI-LS-04 | Primary | Retention/deletion (P4.4) |
+| OSSASAI-CP-02 | Secondary | Credential access control |
+
+---
+
+## Cross-Boundary Attack Analysis
+
+### Attack Chain Taxonomy
+
+Sophisticated attacks frequently traverse multiple boundaries. OSSASAI models these as attack chains:
+
+| Chain Pattern | Boundaries Traversed | Example | Primary Defenses |
+|---------------|---------------------|---------|------------------|
+| **Injection → Execution** | B1 → B3 | Prompt injection leads to malicious shell command | ID-02, TB-01, TB-02 |
+| **Injection → Exfiltration** | B1 → B3 → Network | Injected instruction triggers data upload | ID-02, TB-04 |
+| **Config Compromise → Full Control** | B2 → All | Admin bypass enables complete system compromise | CP-01, CP-02 |
+| **Memory Poison → Future Coercion** | B4 → B1 | Stored instruction retrieved in future session | LS-03, ID-02 |
+| **Supply Chain → Persistent Access** | B3 → B4 | Malicious plugin establishes backdoor | SC-01, SC-02 |
+
+### Defense-in-Depth Model
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    OSSASAI Defense-in-Depth Architecture                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Attack Path: Prompt Injection → Tool Abuse → Data Exfiltration             │
+│                                                                              │
+│  ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌────────┐│
+│  │   B1    │ ──► │   B3    │ ──► │   B3    │ ──► │   B3    │ ──► │Network ││
+│  │  Input  │     │  Tool   │     │  File   │     │ Egress  │     │        ││
+│  │ Filter  │     │ Policy  │     │ Scope   │     │ Filter  │     │        ││
+│  └────┬────┘     └────┬────┘     └────┬────┘     └────┬────┘     └────────┘│
+│       │               │               │               │                     │
+│       ▼               ▼               ▼               ▼                     │
+│    Detect          Restrict        Limit           Block                    │
+│   injection        tools         file access     exfil dest                 │
+│   patterns        available                                                 │
+│                                                                              │
+│  Defense Layers:  4                                                          │
+│  Single Point of Failure: None (requires 4 control bypasses)                │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Implementation Guidance
+
+### Boundary Enforcement Checklist
+
+<Tabs>
+  <Tab title="B1: Inbound Identity">
+**Verification Procedures:**
+- [ ] Verify peer verification is enabled and functional
+- [ ] Test session isolation between different users
+- [ ] Validate input sanitization against injection patterns
+- [ ] Confirm channel-specific capability restrictions
+- [ ] Review logging of peer authentication events
+
+**Common Misconfigurations:**
+- Disabled peer verification in production
+- Shared session state across users
+- Missing channel policy differentiation
+  </Tab>
+
+  <Tab title="B2: Control Plane">
+**Verification Procedures:**
+- [ ] Verify default bind address is loopback
+- [ ] Test authentication requirements for all admin endpoints
+- [ ] Validate proxy trust configuration
+- [ ] Confirm operator/agent credential separation
+- [ ] Review admin action audit logging
+
+**Common Misconfigurations:**
+- Public exposure of admin interfaces
+- Default or weak credentials
+- Missing proxy trust validation
+  </Tab>
+
+  <Tab title="B3: Tool Boundary">
+**Verification Procedures:**
+- [ ] Audit tool capability configuration
+- [ ] Test approval workflow for high-risk actions
+- [ ] Verify sandbox enforcement for untrusted contexts
+- [ ] Validate egress allowlist configuration
+- [ ] Review tool invocation logging
+
+**Common Misconfigurations:**
+- Over-permissioned tool access
+- Disabled approval gates
+- Unrestricted network egress
+  </Tab>
+
+  <Tab title="B4: Local State">
+**Verification Procedures:**
+- [ ] Check file permissions on credential stores
+- [ ] Test log output for sensitive value redaction
+- [ ] Validate memory/RAG injection resistance
+- [ ] Confirm retention policy enforcement
+- [ ] Review secure deletion procedures
+
+**Common Misconfigurations:**
+- World-readable credential files
+- Disabled log redaction
+- Indefinite data retention
+  </Tab>
+</Tabs>
+
+---
+
+## References
+
+### Normative References
+
+- OSSASAI Specification Overview (/spec/overview)
+- OSSASAI Threat Model (/threat-model/overview)
+- OSSASAI Control Catalog (/controls/overview)
+
+### Informative References
+
+**Security Engineering:**
+- Saltzer, J.H., & Schroeder, M.D. (1975). "The Protection of Information in Computer Systems." *Proceedings of the IEEE*.
+- Manadhata, P.K., & Wing, J.M. (2011). "An Attack Surface Metric." *IEEE Transactions on Software Engineering*.
+- Microsoft SDL Threat Modeling Tool Documentation
+
+**AI Security Research:**
+- Greshake, K., et al. (2023). "Not What You've Signed Up For: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection."
+- Perez, F., & Ribeiro, I. (2022). "Ignore This Title and HackAPrompt."
+- OWASP Top 10 for Large Language Model Applications (2023)
+
+**Standards:**
+- NIST SP 800-53 Rev 5: Security and Privacy Controls
+- ISO/IEC 27001:2022: Information Security Management Systems

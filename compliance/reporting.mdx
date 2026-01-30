@@ -1,0 +1,139 @@
+---
+title: 'Compliance Reporting'
+description: 'Report templates and compliance statements'
+---
+
+## Overview
+
+OSSASAI compliance reports document assessment results and provide formal attestation of conformance.
+
+## Report Types
+
+| Report | Purpose | Audience |
+|--------|---------|----------|
+| Assessment Report | Full assessment details | Internal/Assessors |
+| Executive Summary | High-level status | Management |
+| Compliance Statement | Formal attestation | External |
+| Gap Report | Identified deficiencies | Remediation teams |
+
+## Assessment Report Template
+
+```markdown
+# OSSASAI Compliance Assessment Report
+
+## 1. Executive Summary
+- Organization: [Name]
+- Product: [Name] v[Version]
+- Assessment Date: [Date]
+- Target Level: L[1/2/3]
+- Status: [Conformant/Non-Conformant/Partial]
+- Overall Score: [X]%
+
+## 2. Scope
+- Components assessed
+- Exclusions
+- Assessment methodology
+
+## 3. Control Results
+| Control | Status | Finding | Remediation |
+|---------|--------|---------|-------------|
+| CP-01 | PASS | - | - |
+| CP-02 | PASS | - | - |
+| NS-01 | FAIL | HTTP on 8080 | Enable TLS |
+
+## 4. Risk Summary
+- Critical: [X]
+- High: [X]
+- Medium: [X]
+- Low: [X]
+
+## 5. Recommendations
+1. [Recommendation 1]
+2. [Recommendation 2]
+
+## 6. Attestation
+[Signature block]
+```
+
+## Compliance Statement Schema
+
+```yaml
+# compliance-statement.yaml
+compliance_statement:
+  schema_version: "1.0"
+
+  organization:
+    name: "Example Corp"
+    contact: "security@example.com"
+
+  product:
+    name: "AI Coding Assistant"
+    version: "2.1.0"
+    deployment: "SaaS"
+
+  assessment:
+    ocsas_version: "1.0.0"
+    assurance_level: "L2"
+    date: "2025-01-15"
+    methodology: "OSSASAI Assessment Guide v1.0"
+
+  assessor:
+    type: "self"  # or "third_party"
+    name: "Internal Security Team"
+    # For third-party:
+    # organization: "Security Auditors Inc."
+    # certification: "ISO 27001 Lead Auditor"
+
+  results:
+    status: "conformant"  # conformant, non_conformant, partial
+    controls:
+      total: 17
+      passed: 17
+      failed: 0
+    compliance_percentage: 100
+
+  exceptions:
+    # List any exceptions/compensating controls
+    - control: "SC-03"
+      status: "compensating_control"
+      description: "Manual verification in place"
+      remediation_date: "2025-Q2"
+
+  validity:
+    effective_date: "2025-01-15"
+    expiration_date: "2026-01-15"
+    conditions:
+      - "No major architectural changes"
+      - "Continuous monitoring maintained"
+
+  attestation:
+    attester_name: "Jane Smith"
+    attester_title: "CISO"
+    date: "2025-01-15"
+    statement: |
+      I attest that this assessment was conducted in accordance
+      with OSSASAI v1.0 requirements and the results accurately
+      reflect the security posture of the assessed product.
+```
+
+## Generating Reports
+
+```bash
+# Generate full compliance report
+python tools/ossasai-report.py \
+  --assessment audit-results.json \
+  --evidence ./evidence \
+  --output compliance-report.pdf
+
+# Generate executive summary
+python tools/ossasai-report.py \
+  --assessment audit-results.json \
+  --format executive \
+  --output executive-summary.pdf
+
+# Generate machine-readable statement
+python tools/ossasai-report.py \
+  --assessment audit-results.json \
+  --format yaml \
+  --output compliance-statement.yaml
+```

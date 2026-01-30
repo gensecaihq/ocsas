@@ -1,0 +1,410 @@
+---
+title: 'Hardening Checklist'
+description: 'Step-by-step security hardening procedures'
+---
+
+## Overview
+
+This checklist provides comprehensive security hardening steps beyond the minimum control requirements. Use this to strengthen your security posture after achieving baseline compliance.
+
+## Pre-Deployment Checklist
+
+### Environment Preparation
+
+- [ ] Create dedicated service account (non-root)
+- [ ] Configure restrictive umask (077)
+- [ ] Set up isolated filesystem paths
+- [ ] Generate TLS certificates
+- [ ] Configure firewall rules
+- [ ] Enable SELinux/AppArmor
+
+### Configuration Security
+
+- [ ] Remove default credentials
+- [ ] Generate unique API keys
+- [ ] Configure secure defaults
+- [ ] Disable unnecessary features
+- [ ] Enable audit logging
+- [ ] Configure log rotation
+
+---
+
+## L1 Hardening Checklist
+
+### Authentication Hardening
+
+```bash
+# Verify authentication settings
+[ ] Authentication required for all operations
+[ ] Root execution blocked
+[ ] System accounts blocked
+[ ] Session timeout configured
+```
+
+**Configuration:**
+```yaml
+authentication:
+  required: true
+  session_timeout_minutes: 60
+  max_failed_attempts: 5
+  lockout_minutes: 15
+```
+
+### Filesystem Hardening
+
+```bash
+# Filesystem security checks
+[ ] Working directory scope enforced
+[ ] Symlink following disabled
+[ ] Sensitive patterns blocked
+[ ] Path traversal prevented
+```
+
+**Configuration:**
+```yaml
+filesystem:
+  scope: "workdir"
+  follow_symlinks: false
+  canonicalize_paths: true
+  denied:
+    - "**/.env*"
+    - "**/*.key"
+    - "**/*.pem"
+    - "**/secrets/**"
+    - "~/.ssh/**"
+    - "~/.aws/**"
+```
+
+### Command Hardening
+
+```bash
+# Command execution checks
+[ ] Allowlist mode enabled
+[ ] Dangerous commands blocked
+[ ] Shell metacharacters blocked
+[ ] User approval required
+```
+
+**Configuration:**
+```yaml
+commands:
+  mode: "allowlist"
+  require_approval: true
+  shell: false  # Never use shell=True
+  denylist:
+    - "rm -rf /"
+    - "sudo *"
+    - "curl * | *sh"
+    - "chmod 777 *"
+```
+
+### Sensitive Data Protection
+
+```bash
+# Sensitive data checks
+[ ] Credential patterns detected and blocked
+[ ] Private key patterns detected and blocked
+[ ] Output redaction enabled
+[ ] Logging excludes sensitive data
+```
+
+---
+
+## L2 Hardening Checklist
+
+### Network Hardening
+
+```bash
+# Network security checks
+[ ] TLS 1.2+ required
+[ ] Weak ciphers disabled
+[ ] Certificate validation enabled
+[ ] HTTP automatically upgraded to HTTPS
+```
+
+**Configuration:**
+```yaml
+network:
+  tls:
+    required: true
+    min_version: "TLS1.2"
+    ciphers:
+      - "TLS_AES_256_GCM_SHA384"
+      - "TLS_AES_128_GCM_SHA256"
+    deny:
+      - "*CBC*"
+      - "*RC4*"
+      - "*3DES*"
+```
+
+### Session Hardening
+
+```bash
+# Session security checks
+[ ] Session isolation enabled
+[ ] Per-session storage configured
+[ ] Session encryption enabled
+[ ] Secure session cleanup configured
+```
+
+**Configuration:**
+```yaml
+sessions:
+  isolation:
+    enabled: true
+    level: "strict"
+  storage:
+    per_session: true
+    encryption:
+      enabled: true
+      algorithm: "AES-256-GCM"
+  cleanup:
+    on_end: true
+    secure_delete: true
+```
+
+### API Hardening
+
+```bash
+# API security checks
+[ ] Authentication required
+[ ] Rate limiting enabled
+[ ] Input validation configured
+[ ] Security headers enabled
+```
+
+**Configuration:**
+```yaml
+api:
+  authentication:
+    required: true
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 60
+  input:
+    max_size_mb: 10
+  headers:
+    X-Content-Type-Options: "nosniff"
+    X-Frame-Options: "DENY"
+    Strict-Transport-Security: "max-age=31536000"
+```
+
+### Supply Chain Hardening
+
+```bash
+# Supply chain checks
+[ ] Plugin verification enabled
+[ ] Lockfiles required
+[ ] Dependency scanning enabled
+[ ] Vulnerability threshold set
+```
+
+**Configuration:**
+```yaml
+plugins:
+  verification:
+    enabled: true
+    require_signature: true
+
+dependencies:
+  require_lockfile: true
+  verify_hashes: true
+  vulnerability_scan:
+    enabled: true
+    fail_on: "high"
+```
+
+### Resource Hardening
+
+```bash
+# Resource limit checks
+[ ] CPU limits configured
+[ ] Memory limits configured
+[ ] Disk limits configured
+[ ] Operation timeouts configured
+```
+
+---
+
+## L3 Hardening Checklist
+
+### Integrity Hardening
+
+```bash
+# Configuration integrity checks
+[ ] Tamper detection enabled
+[ ] Baseline created
+[ ] Continuous monitoring enabled
+[ ] Alerts configured
+```
+
+### Formal Verification Hardening
+
+```bash
+# Formal verification checks
+[ ] Security invariants defined
+[ ] Continuous invariant checking enabled
+[ ] Policy validation enabled
+[ ] Bypass tests implemented
+```
+
+### Monitoring Hardening
+
+```bash
+# Network monitoring checks
+[ ] Destination tracking enabled
+[ ] Volume monitoring enabled
+[ ] Exfiltration detection enabled
+[ ] SIEM integration configured
+```
+
+### Logging Hardening
+
+```bash
+# Audit logging checks
+[ ] Comprehensive logging enabled
+[ ] Log integrity protection enabled
+[ ] Centralized logging configured
+[ ] Long-term retention configured
+```
+
+---
+
+## Infrastructure Hardening
+
+### Operating System
+
+```bash
+# OS hardening
+[ ] Latest security patches applied
+[ ] Unnecessary services disabled
+[ ] Firewall configured
+[ ] SELinux/AppArmor enabled
+[ ] Automatic updates enabled
+[ ] SSH hardened
+```
+
+**SSH Hardening:**
+```bash
+# /etc/ssh/sshd_config
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+AllowUsers ocsas-admin
+MaxAuthTries 3
+```
+
+### Container Hardening
+
+```bash
+# Container security
+[ ] Non-root user
+[ ] Read-only root filesystem
+[ ] No privileged mode
+[ ] Capabilities dropped
+[ ] Seccomp profile applied
+[ ] Resource limits set
+```
+
+**Dockerfile Best Practices:**
+```dockerfile
+# Use specific version
+FROM ubuntu:22.04
+
+# Create non-root user
+RUN useradd -r -u 1000 ocsas
+USER ocsas
+
+# Drop capabilities in docker-compose or k8s
+```
+
+### Kubernetes Hardening
+
+```yaml
+# Pod Security Policy / Standards
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ocsas
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: ocsas
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+        readOnlyRootFilesystem: true
+```
+
+---
+
+## Verification Commands
+
+### Quick Security Check
+
+```bash
+#!/bin/bash
+# quick-security-check.sh
+
+echo "=== OSSASAI Security Quick Check ==="
+
+# Check running user
+echo -n "Running as non-root: "
+[ $(id -u) -ne 0 ] && echo "PASS" || echo "FAIL"
+
+# Check file permissions
+echo -n "Config file permissions: "
+[ $(stat -c %a /etc/ocsas/config.yaml) -le 600 ] && echo "PASS" || echo "FAIL"
+
+# Check TLS
+echo -n "TLS enabled: "
+grep -q "tls.*required.*true" /etc/ocsas/config.yaml && echo "PASS" || echo "FAIL"
+
+# Check authentication
+echo -n "Authentication required: "
+grep -q "authentication.*required.*true" /etc/ocsas/config.yaml && echo "PASS" || echo "FAIL"
+
+# Run full audit
+echo ""
+echo "=== Running Full Audit ==="
+./ossasai-audit.sh --level L2
+```
+
+### Comprehensive Audit
+
+```bash
+# Run comprehensive security audit
+./ossasai-audit.sh --level L3 --verbose --output report.json
+
+# Check specific areas
+./ossasai-audit.sh --category network
+./ossasai-audit.sh --category filesystem
+./ossasai-audit.sh --category authentication
+```
+
+---
+
+## Post-Deployment Checklist
+
+### Ongoing Maintenance
+
+- [ ] Schedule regular security audits
+- [ ] Monitor security alerts
+- [ ] Review access logs weekly
+- [ ] Update dependencies monthly
+- [ ] Rotate credentials quarterly
+- [ ] Conduct penetration tests annually
+
+### Incident Preparation
+
+- [ ] Document incident response procedures
+- [ ] Configure alerting channels
+- [ ] Test backup and recovery
+- [ ] Establish communication plan
+- [ ] Train team on procedures

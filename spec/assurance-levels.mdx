@@ -1,0 +1,533 @@
+---
+title: 'Assurance Levels'
+description: 'Formal definitions, risk criteria, and control requirements for OSSASAI L1, L2, and L3 assurance levels'
+---
+
+## Abstract
+
+OSSASAI employs a tiered assurance model inspired by established security verification frameworks including OWASP ASVS, Common Criteria EAL, and NIST SP 800-53 control baselines. This document defines three assurance levels (L1, L2, L3) representing graduated security requirements aligned with deployment risk profiles, regulatory contexts, and operational environments.
+
+<CardGroup cols={3}>
+  <Card title="L1: Local-First Baseline" icon="laptop">
+    Single operator, local administration, minimal network exposure
+  </Card>
+  <Card title="L2: Network-Aware" icon="network-wired">
+    Remote access, team usage, network-exposed control plane
+  </Card>
+  <Card title="L3: High-Risk Runtime" icon="shield-halved">
+    Multi-tenant, plugin-rich, regulated data, formal verification
+  </Card>
+</CardGroup>
+
+## Theoretical Foundation
+
+### Risk-Based Security Engineering
+
+OSSASAI's tiered model follows the risk-based approach advocated by NIST SP 800-39 (Managing Information Security Risk) and ISO 31000 (Risk Management). Assurance levels correspond to distinct threat environments and consequence categories:
+
+| Level | Threat Environment | Consequence Category | Reference Model |
+|-------|-------------------|---------------------|-----------------|
+| L1 | Opportunistic, accidental | Limited, recoverable | NIST Low Impact |
+| L2 | Targeted, persistent | Moderate, significant | NIST Moderate Impact |
+| L3 | Sophisticated, nation-state | Severe, catastrophic | NIST High Impact |
+
+*Reference: NIST SP 800-60 (Guide for Mapping Types of Information and Information Systems to Security Categories)*
+
+### Maturity Model Alignment
+
+OSSASAI levels align with capability maturity frameworks:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                 OSSASAI-Maturity Model Correspondence                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  OSSASAI    CMMI        OWASP SAMM     NIST CSF Tier    Common Criteria     │
+│  ─────────────────────────────────────────────────────────────────────────  │
+│    L1       Level 2     Maturity 1     Tier 1-2         EAL 1-2             │
+│             Managed     Initial        Partial          Functional Test     │
+│                                                                              │
+│    L2       Level 3     Maturity 2     Tier 2-3         EAL 3-4             │
+│             Defined     Managed        Repeatable       Methodical Test     │
+│                                                                              │
+│    L3       Level 4-5   Maturity 3     Tier 3-4         EAL 5-6             │
+│             Optimizing  Measured       Adaptive         Semi-Formal         │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+## Level Selection Framework
+
+### Decision Criteria Matrix
+
+Organizations MUST evaluate deployment characteristics against the following criteria matrix:
+
+| Criterion | L1 Threshold | L2 Threshold | L3 Threshold |
+|-----------|--------------|--------------|--------------|
+| **Network Exposure** | Loopback/localhost | LAN/VPN/Tailnet | Public internet |
+| **User Population** | Single operator | Known team (<50) | Multi-tenant/unknown |
+| **Tool Capabilities** | Read-only, scoped | Limited write | Unrestricted |
+| **Data Classification** | Public, internal | Confidential | Regulated (PII/PHI/PCI) |
+| **Autonomy Level** | Human-in-loop always | Approval for sensitive | Delegated authority |
+| **Integration Depth** | None/minimal | Standard connectors | Plugin ecosystem |
+| **Regulatory Context** | None | SOC 2/ISO 27001 | HIPAA/PCI-DSS/FedRAMP |
+| **Attack Surface Value** | Low | Medium | High |
+
+### Algorithmic Level Determination
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    OSSASAI Level Selection Algorithm                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  INPUT: Deployment characteristics                                          │
+│  OUTPUT: Minimum required assurance level                                   │
+│                                                                              │
+│  1. IF (network_exposure = PUBLIC) OR (data_class = REGULATED):            │
+│        → L3 Required                                                        │
+│                                                                              │
+│  2. ELSE IF (network_exposure = LAN/VPN) OR (user_count > 1) OR            │
+│             (data_class = CONFIDENTIAL) OR (regulatory = SOC2/ISO27001):   │
+│        → L2 Required                                                        │
+│                                                                              │
+│  3. ELSE IF (network_exposure = LOCALHOST) AND (user_count = 1) AND        │
+│             (data_class ≤ INTERNAL) AND (regulatory = NONE):               │
+│        → L1 Sufficient                                                      │
+│                                                                              │
+│  4. WHEN IN DOUBT: Select higher level                                      │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+<Note>
+**Conservative Principle:** When deployment characteristics span multiple level thresholds, organizations SHOULD select the higher assurance level. The marginal cost of additional controls is typically less than the potential impact of insufficient protection.
+</Note>
+
+---
+
+## L1: Local-First Baseline
+
+### Formal Definition
+
+**L1** provides baseline security assurance for AI agent systems operating within a single operator's security context with minimal network exposure. L1 addresses accidental exposure, local privilege abuse, and configuration errors while maintaining low implementation overhead.
+
+### Deployment Profile
+
+| Attribute | Specification |
+|-----------|---------------|
+| **Network Connectivity** | Loopback binding (`127.0.0.1`); no external network required |
+| **User Population** | Single operator with exclusive administrative control |
+| **Data Classification** | Non-sensitive, internal, or public data only |
+| **Regulatory Context** | No specific regulatory requirements |
+| **Audit Requirements** | Basic logging; self-assessment sufficient |
+| **Attack Surface** | Minimal; local compromise scenario |
+
+### Threat Model Scope
+
+L1 controls address the following adversary classes (per OSSASAI Threat Model):
+
+- **A1 (Opportunistic)**: Automated scanning, opportunistic exploitation
+- **A2 (Curious Insider)**: Accidental exposure, unintentional misconfiguration
+
+### Control Requirements
+
+<Accordion title="L1 Mandatory Controls (MUST)" icon="check">
+
+| Control ID | Title | Boundary | Rationale |
+|------------|-------|----------|-----------|
+| OSSASAI-CP-01 | Default-Deny Control Plane Exposure | B2 | Prevents accidental admin surface exposure |
+| OSSASAI-CP-02 | Strong Admin Authentication | B2 | Protects configuration from unauthorized modification |
+| OSSASAI-ID-02 | Session Isolation by Default | B1 | Prevents cross-context information leakage |
+| OSSASAI-TB-01 | Least Privilege Tool Configuration | B3 | Limits blast radius of tool misuse |
+| OSSASAI-TB-02 | Approval Gates for High-Risk Actions | B3 | Human-in-loop for sensitive operations |
+| OSSASAI-LS-01 | Secrets Protected at Rest | B4 | Prevents credential theft from local storage |
+| OSSASAI-LS-02 | Sensitive Log Redaction | B4 | Prevents secrets leakage via logs |
+
+</Accordion>
+
+<Accordion title="L1 Recommended Controls (SHOULD)" icon="thumbs-up">
+
+| Control ID | Title | Boundary | Rationale |
+|------------|-------|----------|-----------|
+| OSSASAI-SC-01 | Explicit Plugin Trust | B3 | Reduces supply chain risk |
+| OSSASAI-LS-03 | Memory Safety Protections | B4 | Prevents instruction smuggling |
+
+</Accordion>
+
+### Verification Requirements
+
+| Verification Type | Requirement |
+|-------------------|-------------|
+| **Automated Audit** | MUST pass `ossasai-audit.sh --level L1` |
+| **Configuration Review** | MUST verify secure default settings |
+| **Self-Assessment** | MUST complete L1 conformance checklist |
+| **Evidence Retention** | SHOULD retain audit results for 90 days |
+
+### Exemplar Deployments
+
+- Individual developer workstations
+- Personal AI coding assistants
+- Learning and educational environments
+- Proof-of-concept and prototyping
+- Hobby projects with non-sensitive code
+
+---
+
+## L2: Network-Aware
+
+### Formal Definition
+
+**L2** extends L1 with controls for network-connected deployments where the agent system accepts connections from remote users, operates across network boundaries, or processes data with elevated sensitivity. L2 addresses network-based attacks, session compromise, and supply chain threats.
+
+### Deployment Profile
+
+| Attribute | Specification |
+|-----------|---------------|
+| **Network Connectivity** | LAN, VPN, tailnet, or controlled internet exposure |
+| **User Population** | Known team or organization (2-50 users) |
+| **Data Classification** | Confidential, internal business, proprietary code |
+| **Regulatory Context** | SOC 2 Type II, ISO/IEC 27001, basic compliance |
+| **Audit Requirements** | Comprehensive logging with retention |
+| **Attack Surface** | Moderate; network-accessible components |
+
+### Threat Model Scope
+
+L2 controls address the following adversary classes:
+
+- **A1–A2**: All L1 threats
+- **A3 (Targeted Attacker)**: Deliberate targeting, persistent access attempts
+- **A4 (Organized Crime)**: Financial motivation, credential theft, data exfiltration
+
+### Control Requirements
+
+<Accordion title="L2 Mandatory Controls (MUST)" icon="check">
+
+| Control ID | Title | Boundary | Rationale |
+|------------|-------|----------|-----------|
+| *All L1 MUST Controls* | — | — | Cumulative requirement |
+| OSSASAI-CP-03 | Proxy Trust Boundary Configuration | B2 | Prevents header spoofing attacks |
+| OSSASAI-CP-04 | Operator/Agent Identity Separation | B2 | Enforces privilege separation |
+| OSSASAI-ID-01 | Peer Verification for New Contacts | B1 | Prevents unauthorized message processing |
+| OSSASAI-ID-03 | Group Channel Policy Hardening | B1 | Restricts capabilities in shared contexts |
+| OSSASAI-TB-03 | Sandboxing for Untrusted Contexts | B3 | Isolates execution environments |
+| OSSASAI-TB-04 | Outbound Data Exfiltration Controls | B3 | Prevents data leakage via tools |
+| OSSASAI-LS-04 | Retention and Deletion Guarantees | B4 | Ensures data lifecycle management |
+| OSSASAI-SC-02 | Reproducible Builds and Pinning | B3 | Ensures supply chain integrity |
+| OSSASAI-NS-01 | TLS Enforcement | B2, B3 | Protects data in transit |
+| OSSASAI-NS-02 | Certificate Validation | B2, B3 | Prevents MITM attacks |
+
+</Accordion>
+
+<Accordion title="L2 Recommended Controls (SHOULD)" icon="thumbs-up">
+
+| Control ID | Title | Boundary | Rationale |
+|------------|-------|----------|-----------|
+| OSSASAI-FV-01 | Security Invariant Formal Verification | All | Provides high-assurance evidence |
+| OSSASAI-NS-03 | Egress Filtering | B3 | Limits outbound connectivity |
+
+</Accordion>
+
+### Verification Requirements
+
+| Verification Type | Requirement |
+|-------------------|-------------|
+| **Automated Audit** | MUST pass `ossasai-audit.sh --level L2` |
+| **Network Analysis** | MUST verify TLS enforcement |
+| **Session Testing** | MUST verify session isolation |
+| **Dependency Scan** | MUST verify supply chain integrity |
+| **Configuration Review** | MUST verify all L2 settings |
+| **Evidence Retention** | MUST retain audit results for 1 year |
+| **Third-Party Assessment** | RECOMMENDED for compliance |
+
+### Exemplar Deployments
+
+- Engineering teams at technology companies
+- Organizations with SOC 2 compliance requirements
+- Shared development environments with multiple users
+- CI/CD integrated AI assistants
+- Remote-first teams using network-accessible agents
+
+---
+
+## L3: High-Risk Runtime
+
+### Formal Definition
+
+**L3** provides the highest level of security assurance for AI agent systems operating in high-risk environments. L3 addresses sophisticated adversaries, nation-state threats, and regulatory compliance requirements demanding formal verification and comprehensive audit trails.
+
+### Deployment Profile
+
+| Attribute | Specification |
+|-----------|---------------|
+| **Network Connectivity** | Controlled, monitored, potentially public |
+| **User Population** | Enterprise scale, multi-tenant, or public users |
+| **Data Classification** | Regulated (PII, PHI, PCI), highly sensitive IP |
+| **Regulatory Context** | HIPAA, PCI-DSS, FedRAMP, SOX, GDPR |
+| **Audit Requirements** | Tamper-evident, long-term retention, third-party verification |
+| **Attack Surface** | High; tool-rich, plugin-heavy, external connectivity |
+
+### Threat Model Scope
+
+L3 controls address the full adversary spectrum:
+
+- **A1–A4**: All L1 and L2 threats
+- **A5 (Nation-State/APT)**: Sophisticated capabilities, persistence, supply chain targeting
+
+### Control Requirements
+
+<Accordion title="L3 Mandatory Controls (MUST)" icon="check">
+
+| Control ID | Title | Boundary | Rationale |
+|------------|-------|----------|-----------|
+| *All L1 and L2 MUST Controls* | — | — | Cumulative requirement |
+| OSSASAI-FV-01 | Security Invariant Formal Verification | All | Machine-checkable security proofs |
+| OSSASAI-FV-02 | Negative Model Regression Testing | All | Ensures violations remain detectable |
+| OSSASAI-NS-03 | Egress Filtering and Allowlisting | B3 | Strict outbound traffic control |
+| OSSASAI-NS-04 | Network Traffic Analysis | B2, B3 | Anomaly detection and monitoring |
+
+</Accordion>
+
+<Accordion title="L3 Recommended Controls (SHOULD)" icon="thumbs-up">
+
+| Control ID | Title | Boundary | Rationale |
+|------------|-------|----------|-----------|
+| OSSASAI-FV-03 | Continuous Verification in CI/CD | All | Ensures ongoing compliance |
+| Hardware Security Modules | Key management | B4 | Cryptographic key protection |
+| Zero Trust Architecture | Network | All | Assume breach security model |
+
+</Accordion>
+
+### Verification Requirements
+
+| Verification Type | Requirement |
+|-------------------|-------------|
+| **Automated Audit** | MUST pass `ossasai-audit.sh --level L3` |
+| **Formal Verification** | MUST provide TLA+/TLC or equivalent proofs |
+| **Third-Party Assessment** | MUST complete independent security assessment |
+| **Penetration Testing** | MUST conduct annual penetration tests |
+| **Audit Log Integrity** | MUST implement tamper-evident logging |
+| **Evidence Retention** | MUST retain for regulatory period (typically 7 years) |
+| **Continuous Monitoring** | MUST implement real-time security monitoring |
+
+### Exemplar Deployments
+
+- Financial services institutions
+- Healthcare organizations (HIPAA compliance)
+- Government contractors (FedRAMP)
+- Defense and aerospace
+- Critical infrastructure operators
+- Organizations with sensitive intellectual property
+
+---
+
+## Control Distribution Summary
+
+### Quantitative Overview
+
+| Domain | L1 Required | L2 Required | L3 Required | Total |
+|--------|-------------|-------------|-------------|-------|
+| Control Plane (CP) | 2 | 4 | 4 | 4 |
+| Identity & Session (ID) | 1 | 3 | 3 | 3 |
+| Tool Blast Radius (TB) | 2 | 4 | 4 | 4 |
+| Local State (LS) | 2 | 4 | 4 | 4 |
+| Supply Chain (SC) | 0 | 2 | 2 | 2 |
+| Formal Verification (FV) | 0 | 0 | 2 | 3 |
+| Network Security (NS) | 0 | 2 | 4 | 4 |
+| **Cumulative Total** | **7** | **19** | **23** | **24** |
+
+### Visual Distribution
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    OSSASAI Control Distribution by Level                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Domain          L1           L2           L3                               │
+│  ───────────────────────────────────────────────────────────────────────── │
+│  Control Plane   ██           ████         ████                             │
+│  Identity        █            ███          ███                              │
+│  Tool Blast      ██           ████         ████                             │
+│  Local State     ██           ████         ████                             │
+│  Supply Chain    ·            ██           ██                               │
+│  Formal Verif    ·            ·            ██                               │
+│  Network Sec     ·            ██           ████                             │
+│  ───────────────────────────────────────────────────────────────────────── │
+│  Cumulative      7            19           23                               │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+## Level Transition Procedures
+
+### L1 → L2 Transition
+
+<Steps>
+  <Step title="Gap Assessment">
+    Execute gap analysis against L2 requirements:
+    ```bash
+    ossasai-audit.sh --level L2 --report-gaps --output gaps-l2.json
+    ```
+  </Step>
+  <Step title="Network Security Implementation">
+    Deploy TLS enforcement (NS-01) and certificate validation (NS-02)
+  </Step>
+  <Step title="Identity Controls Enhancement">
+    Implement peer verification (ID-01) and group policy hardening (ID-03)
+  </Step>
+  <Step title="Tool Governance Upgrade">
+    Deploy sandboxing (TB-03) and egress controls (TB-04)
+  </Step>
+  <Step title="Supply Chain Hardening">
+    Enable reproducible builds and dependency pinning (SC-02)
+  </Step>
+  <Step title="Verification and Attestation">
+    Re-run audit, document evidence, publish conformance statement
+  </Step>
+</Steps>
+
+### L2 → L3 Transition
+
+<Steps>
+  <Step title="Gap Assessment">
+    Execute comprehensive gap analysis:
+    ```bash
+    ossasai-audit.sh --level L3 --report-gaps --output gaps-l3.json
+    ```
+  </Step>
+  <Step title="Formal Verification Deployment">
+    Implement TLA+/TLC models for security invariants (FV-01, FV-02)
+  </Step>
+  <Step title="Network Monitoring Enhancement">
+    Deploy network traffic analysis and anomaly detection (NS-04)
+  </Step>
+  <Step title="Egress Hardening">
+    Implement strict egress filtering with allowlisting (NS-03)
+  </Step>
+  <Step title="Evidence Infrastructure">
+    Deploy tamper-evident logging and long-term evidence retention
+  </Step>
+  <Step title="Third-Party Assessment">
+    Engage qualified security assessor for independent verification
+  </Step>
+</Steps>
+
+---
+
+## Conformance Documentation
+
+### Conformance Statement Schema
+
+Organizations claiming OSSASAI conformance MUST publish a conformance statement:
+
+```yaml
+# OSSASAI Conformance Statement
+# Schema Version: 1.0
+
+organization:
+  name: "[Organization Name]"
+  contact: "[Security Contact Email]"
+
+product:
+  name: "[Product Name]"
+  version: "[Product Version]"
+  type: "[Agent Framework|Copilot|Assistant|etc.]"
+
+conformance:
+  ossasai_version: "0.1.0"
+  assurance_level: "L2"  # L1, L2, or L3
+  assessment_date: "2025-01-30"
+  expiration_date: "2026-01-30"  # 1 year validity
+
+assessment:
+  type: "self" | "third-party"
+  assessor: "[Assessor Name if third-party]"
+  methodology: "[Assessment methodology reference]"
+
+controls:
+  must_implemented: 19
+  should_implemented: 4
+  may_implemented: 2
+
+exceptions:
+  - control_id: "OSSASAI-FV-01"
+    status: "not_implemented"
+    justification: "Formal verification planned for v2.0"
+    compensating_control: "Enhanced integration testing"
+    remediation_target: "2025-Q3"
+
+evidence:
+  package_uri: "[URL to evidence package]"
+  hash_sha256: "[Evidence package hash]"
+```
+
+### Attestation Requirements by Level
+
+| Requirement | L1 | L2 | L3 |
+|-------------|:--:|:--:|:--:|
+| Self-Assessment | ✓ Sufficient | ✓ Sufficient | ✗ Insufficient |
+| Automated Audit Passing | MUST | MUST | MUST |
+| Configuration Review | MUST | MUST | MUST |
+| Third-Party Assessment | MAY | SHOULD | MUST |
+| Penetration Testing | MAY | SHOULD | MUST |
+| Formal Verification Evidence | MAY | MAY | MUST |
+| Evidence Package Publication | SHOULD | MUST | MUST |
+| Annual Re-Certification | SHOULD | MUST | MUST |
+
+---
+
+## International Standards Alignment
+
+### OWASP ASVS Correspondence
+
+| OSSASAI Level | ASVS Level | Alignment Rationale |
+|---------------|------------|---------------------|
+| L1 | Level 1 | Automated verification, baseline controls |
+| L2 | Level 2 | Standard security requirements, design verification |
+| L3 | Level 3 | High-assurance requirements, comprehensive verification |
+
+### NIST CSF Tier Mapping
+
+| OSSASAI Level | CSF Tier | Characteristics |
+|---------------|----------|-----------------|
+| L1 | Tier 1-2 | Partial to Risk Informed |
+| L2 | Tier 2-3 | Risk Informed to Repeatable |
+| L3 | Tier 3-4 | Repeatable to Adaptive |
+
+### Common Criteria EAL Guidance
+
+| OSSASAI Level | Suggested EAL | Verification Approach |
+|---------------|---------------|----------------------|
+| L1 | EAL 1-2 | Functionally tested |
+| L2 | EAL 3-4 | Methodically tested and reviewed |
+| L3 | EAL 5-6 | Semi-formally verified |
+
+### ISO/IEC 27001 Control Mapping
+
+OSSASAI controls map to ISO/IEC 27001:2022 Annex A controls. See [Standards Mapping](/appendices/standards-mapping) for complete correspondence table.
+
+---
+
+## References
+
+### Normative References
+
+- OSSASAI Specification Overview (/spec/overview)
+- OSSASAI Control Catalog (/controls/overview)
+- OSSASAI Threat Model (/threat-model/overview)
+
+### Informative References
+
+**Assurance Frameworks:**
+- OWASP Application Security Verification Standard (ASVS) v4.0
+- Common Criteria for Information Technology Security Evaluation (ISO/IEC 15408)
+- NIST SP 800-53 Rev 5: Security and Privacy Controls
+- NIST Cybersecurity Framework v2.0
+
+**Risk Management:**
+- NIST SP 800-39: Managing Information Security Risk
+- NIST SP 800-60: Guide for Mapping Information to Security Categories
+- ISO 31000: Risk Management — Guidelines
+
+**Maturity Models:**
+- CMMI for Development (CMMI-DEV)
+- OWASP Software Assurance Maturity Model (SAMM)

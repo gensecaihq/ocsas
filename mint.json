@@ -1,0 +1,181 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "OSSASAI - Open Security Standard for Agentic Systems",
+  "logo": {
+    "dark": "/images/logo-dark.svg",
+    "light": "/images/logo-light.svg"
+  },
+  "favicon": "/images/favicon.svg",
+  "colors": {
+    "primary": "#0D9373",
+    "light": "#07C983",
+    "dark": "#0D9373",
+    "anchors": {
+      "from": "#0D9373",
+      "to": "#07C983"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/ossasai/ossasai"
+    },
+    {
+      "name": "OpenClaw",
+      "url": "https://openclaw.ai"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get Started",
+    "url": "/introduction"
+  },
+  "tabs": [
+    {
+      "name": "Specification",
+      "url": "spec"
+    },
+    {
+      "name": "Controls",
+      "url": "controls"
+    },
+    {
+      "name": "Implementation",
+      "url": "implementation"
+    },
+    {
+      "name": "Tools",
+      "url": "tools"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "Quick Start",
+      "icon": "rocket",
+      "url": "implementation/quickstart"
+    },
+    {
+      "name": "Control Catalog",
+      "icon": "shield-check",
+      "url": "controls/overview"
+    },
+    {
+      "name": "Threat Model",
+      "icon": "skull",
+      "url": "threat-model/overview"
+    },
+    {
+      "name": "Compliance",
+      "icon": "clipboard-check",
+      "url": "compliance/overview"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction"
+      ]
+    },
+    {
+      "group": "Specification",
+      "pages": [
+        "spec/overview",
+        "spec/assurance-levels",
+        "spec/trust-boundaries",
+        "spec/compliance-workflow"
+      ]
+    },
+    {
+      "group": "Profiles",
+      "pages": [
+        "profiles/openclaw"
+      ]
+    },
+    {
+      "group": "Threat Model",
+      "pages": [
+        "threat-model/overview",
+        "threat-model/adversary-classes",
+        "threat-model/attack-vectors",
+        "threat-model/ai-agent-threats",
+        "threat-model/risk-scoring"
+      ]
+    },
+    {
+      "group": "Control Catalog",
+      "pages": [
+        "controls/overview",
+        "controls/control-plane",
+        "controls/identity-session",
+        "controls/tool-blast-radius",
+        "controls/local-state",
+        "controls/supply-chain",
+        "controls/formal-verification",
+        "controls/network-security"
+      ]
+    },
+    {
+      "group": "Implementation",
+      "pages": [
+        "implementation/quickstart",
+        "implementation/l1-deployment",
+        "implementation/l2-deployment",
+        "implementation/l3-deployment",
+        "implementation/hardening-checklist",
+        "implementation/ci-cd-integration"
+      ]
+    },
+    {
+      "group": "Security Testing",
+      "pages": [
+        "testing/overview",
+        "testing/automated-audit",
+        "testing/penetration-testing",
+        "testing/verification-procedures"
+      ]
+    },
+    {
+      "group": "Compliance",
+      "pages": [
+        "compliance/overview",
+        "compliance/evidence-collection",
+        "compliance/reporting",
+        "compliance/continuous-monitoring"
+      ]
+    },
+    {
+      "group": "Incident Response",
+      "pages": [
+        "incident-response/overview",
+        "incident-response/playbooks",
+        "incident-response/recovery",
+        "incident-response/post-incident"
+      ]
+    },
+    {
+      "group": "Appendices",
+      "pages": [
+        "appendices/standards-mapping",
+        "appendices/glossary",
+        "appendices/changelog"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/ossasai/ossasai"
+  },
+  "feedback": {
+    "thumbsRating": true,
+    "suggestEdit": true
+  },
+  "analytics": {
+    "posthog": {
+      "apiKey": ""
+    }
+  },
+  "openapi": [],
+  "api": {},
+  "modeToggle": {
+    "default": "dark"
+  }
+}

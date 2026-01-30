@@ -1,0 +1,108 @@
+---
+title: 'Post-Incident Review'
+description: 'Lessons learned and continuous improvement process'
+---
+
+## Overview
+
+Post-incident review captures lessons learned and drives continuous improvement of security controls and incident response capabilities.
+
+## Review Process
+
+### Timeline
+
+| Activity | Timing |
+|----------|--------|
+| Initial debrief | Within 24 hours |
+| Root cause analysis | Within 1 week |
+| Written report | Within 2 weeks |
+| Improvement implementation | Within 30 days |
+| Follow-up review | 90 days |
+
+### Participants
+
+- Incident Commander
+- Security analysts involved
+- Operations team
+- Product/Engineering (if code changes needed)
+- Management (for high-severity)
+
+## Post-Incident Report Template
+
+```markdown
+# Post-Incident Review Report
+
+## Incident Summary
+- **ID**: INC-2025-001
+- **Date**: 2025-01-15
+- **Severity**: High
+- **Duration**: 2 hours 15 minutes
+- **Status**: Resolved
+
+## Timeline
+| Time | Event |
+|------|-------|
+| 10:00 | Alert triggered |
+| 10:05 | Analyst begins investigation |
+| 10:15 | Incident confirmed, escalated |
+| 10:30 | Containment actions taken |
+| 11:00 | Root cause identified |
+| 12:15 | Recovery complete |
+
+## Impact
+- Sessions affected: 5
+- Data potentially exposed: None confirmed
+- Service disruption: 45 minutes
+
+## Root Cause
+[Description of root cause]
+
+## What Went Well
+1. Detection was rapid (5 minutes)
+2. Containment was effective
+3. Communication was clear
+
+## What Could Be Improved
+1. Playbook didn't cover this scenario
+2. Recovery took longer than target
+3. Some logs were incomplete
+
+## Action Items
+| Action | Owner | Due | Status |
+|--------|-------|-----|--------|
+| Update playbook | Security | 2025-01-30 | Open |
+| Add monitoring | Ops | 2025-02-01 | Open |
+| Fix logging gap | Dev | 2025-01-25 | In Progress |
+
+## Control Improvements
+- [ ] Add detection for [specific pattern]
+- [ ] Strengthen control [ID]
+- [ ] Update policy [name]
+```
+
+## Metrics to Track
+
+| Metric | Target | Actual |
+|--------|--------|--------|
+| Mean Time to Detect | < 15 min | |
+| Mean Time to Contain | < 30 min | |
+| Mean Time to Recover | < 4 hours | |
+| Playbook Coverage | 100% | |
+| Action Item Completion | 100% in 30 days | |
+
+## Continuous Improvement
+
+### Quarterly Review
+
+- Review all incidents from quarter
+- Identify trends and patterns
+- Update threat model if needed
+- Assess control effectiveness
+- Plan improvements
+
+### Annual Assessment
+
+- Full incident response exercise
+- Tabletop exercises for new scenarios
+- Third-party assessment of IR capability
+- Program maturity evaluation
