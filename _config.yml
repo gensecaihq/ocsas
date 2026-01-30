@@ -3,11 +3,13 @@
 
 title: OCSAS
 description: OpenClaw Security Assurance Standard - Security checklist and hardening guide for OpenClaw users
-remote_theme: just-the-docs/just-the-docs
+theme: just-the-docs
 
 # Plugins
 plugins:
   - jekyll-redirect-from
+  - jekyll-seo-tag
+  - jekyll-sitemap
 
 # Repository information
 url: https://gensecaihq.github.io
