@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "name": "OSSASAI - Open Security Standard for Agentic Systems",
+  "name": "OCSAS - OpenClaw Security Assurance Standard",
   "logo": {
     "dark": "/images/logo-dark.svg",
     "light": "/images/logo-light.svg"
@@ -17,8 +17,8 @@
   },
   "topbarLinks": [
     {
-      "name": "GitHub",
-      "url": "https://github.com/ossasai/ossasai"
+      "name": "OSSASAI",
+      "url": "https://github.com/gensecaihq/ossasai"
     },
     {
       "name": "OpenClaw",
@@ -26,10 +26,14 @@
     }
   ],
   "topbarCtaButton": {
-    "name": "Get Started",
-    "url": "/introduction"
+    "name": "OpenClaw Profile",
+    "url": "/profiles/openclaw"
   },
   "tabs": [
+    {
+      "name": "Profile",
+      "url": "profiles"
+    },
     {
       "name": "Specification",
       "url": "spec"
@@ -41,32 +45,23 @@
     {
       "name": "Implementation",
       "url": "implementation"
-    },
-    {
-      "name": "Tools",
-      "url": "tools"
     }
   ],
   "anchors": [
     {
-      "name": "Quick Start",
-      "icon": "rocket",
-      "url": "implementation/quickstart"
+      "name": "OpenClaw Profile",
+      "icon": "claw",
+      "url": "profiles/openclaw"
     },
     {
-      "name": "Control Catalog",
-      "icon": "shield-check",
-      "url": "controls/overview"
+      "name": "OSSASAI Framework",
+      "icon": "shield-halved",
+      "url": "https://github.com/gensecaihq/ossasai"
     },
     {
-      "name": "Threat Model",
-      "icon": "skull",
-      "url": "threat-model/overview"
-    },
-    {
-      "name": "Compliance",
-      "icon": "clipboard-check",
-      "url": "compliance/overview"
+      "name": "OpenClaw Docs",
+      "icon": "book",
+      "url": "https://docs.openclaw.ai/gateway/security"
     }
   ],
   "navigation": [
@@ -77,18 +72,18 @@
       ]
     },
     {
+      "group": "OpenClaw Profile",
+      "pages": [
+        "profiles/openclaw"
+      ]
+    },
+    {
       "group": "Specification",
       "pages": [
         "spec/overview",
         "spec/assurance-levels",
         "spec/trust-boundaries",
         "spec/compliance-workflow"
-      ]
-    },
-    {
-      "group": "Profiles",
-      "pages": [
-        "profiles/openclaw"
       ]
     },
     {
@@ -162,19 +157,8 @@
     }
   ],
   "footerSocials": {
-    "github": "https://github.com/ossasai/ossasai"
+    "github": "https://github.com/gensecaihq/ocsas"
   },
-  "feedback": {
-    "thumbsRating": true,
-    "suggestEdit": true
-  },
-  "analytics": {
-    "posthog": {
-      "apiKey": ""
-    }
-  },
-  "openapi": [],
-  "api": {},
   "modeToggle": {
     "default": "dark"
   }

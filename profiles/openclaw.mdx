@@ -755,8 +755,8 @@ cat ~/.openclaw/extensions/<pluginId>/package.json
   <Accordion title="OSSASAI-FV-01: Security Invariant Formal Verification" icon="microscope">
 **OpenClaw Implementation:**
 - TLA+/TLC models for security-critical paths
-- Models maintained in [openclaw-formal-models](https://github.com/vignesh07/openclaw-formal-models)
 - Covers: gateway exposure, nodes.run pipeline, pairing, ingress gating, session isolation
+- See OpenClaw documentation for model details and reproduction steps
 
 **Verified Claims:**
 | Model | Claim |
@@ -767,14 +767,6 @@ cat ~/.openclaw/extensions/<pluginId>/package.json
 | `ingress-gating` | Mention gating blocks unauthorized commands |
 | `routing-isolation` | Distinct peers don't collapse sessions |
 
-**Reproduce:**
-```bash
-git clone https://github.com/vignesh07/openclaw-formal-models
-cd openclaw-formal-models
-make gateway-exposure-v2
-make nodes-pipeline
-```
-
 **OpenClaw Docs:** [Formal Verification](https://docs.openclaw.ai/security/formal-verification/)
   </Accordion>
 
@@ -784,15 +776,12 @@ make nodes-pipeline
 - Ensures detection capability for realistic bug classes
 - Counterexample traces preserved for analysis
 
-**Negative Models:**
-```bash
-# These MUST fail (produce counterexamples)
-make gateway-exposure-v2-negative
-make nodes-pipeline-negative
-make pairing-negative
-make ingress-gating-negative
-make routing-isolation-negative
-```
+**Available Negative Models:**
+- `gateway-exposure-v2-negative`
+- `nodes-pipeline-negative`
+- `pairing-negative`
+- `ingress-gating-negative`
+- `routing-isolation-negative`
 
 **OpenClaw Docs:** [Formal Verification - Negative Models](https://docs.openclaw.ai/security/formal-verification/)
   </Accordion>
@@ -801,13 +790,11 @@ make routing-isolation-negative
 **OpenClaw Implementation:**
 - Models can be run in CI via `make` targets
 - Java 11+ required (TLC runs on JVM)
-- Repo vendors pinned `tla2tools.jar`
 
 **CI Integration Example:**
 ```yaml
 - name: Run Formal Verification
   run: |
-    cd formal-models
     make gateway-exposure-v2
     make nodes-pipeline
     make pairing
