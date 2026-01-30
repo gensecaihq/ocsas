@@ -26,32 +26,14 @@
     }
   ],
   "topbarCtaButton": {
-    "name": "OpenClaw Profile",
-    "url": "/profiles/openclaw"
+    "name": "OpenClaw Docs",
+    "url": "https://docs.openclaw.ai/gateway/security"
   },
-  "tabs": [
-    {
-      "name": "Profile",
-      "url": "profiles"
-    },
-    {
-      "name": "Specification",
-      "url": "spec"
-    },
-    {
-      "name": "Controls",
-      "url": "controls"
-    },
-    {
-      "name": "Implementation",
-      "url": "implementation"
-    }
-  ],
   "anchors": [
     {
       "name": "OpenClaw Profile",
-      "icon": "claw",
-      "url": "profiles/openclaw"
+      "icon": "shield-check",
+      "url": "/profiles/openclaw"
     },
     {
       "name": "OSSASAI Framework",
@@ -59,100 +41,17 @@
       "url": "https://github.com/gensecaihq/ossasai"
     },
     {
-      "name": "OpenClaw Docs",
-      "icon": "book",
+      "name": "OpenClaw Security",
+      "icon": "lock",
       "url": "https://docs.openclaw.ai/gateway/security"
     }
   ],
   "navigation": [
     {
-      "group": "Getting Started",
+      "group": "OCSAS",
       "pages": [
-        "introduction"
-      ]
-    },
-    {
-      "group": "OpenClaw Profile",
-      "pages": [
+        "introduction",
         "profiles/openclaw"
-      ]
-    },
-    {
-      "group": "Specification",
-      "pages": [
-        "spec/overview",
-        "spec/assurance-levels",
-        "spec/trust-boundaries",
-        "spec/compliance-workflow"
-      ]
-    },
-    {
-      "group": "Threat Model",
-      "pages": [
-        "threat-model/overview",
-        "threat-model/adversary-classes",
-        "threat-model/attack-vectors",
-        "threat-model/ai-agent-threats",
-        "threat-model/risk-scoring"
-      ]
-    },
-    {
-      "group": "Control Catalog",
-      "pages": [
-        "controls/overview",
-        "controls/control-plane",
-        "controls/identity-session",
-        "controls/tool-blast-radius",
-        "controls/local-state",
-        "controls/supply-chain",
-        "controls/formal-verification",
-        "controls/network-security"
-      ]
-    },
-    {
-      "group": "Implementation",
-      "pages": [
-        "implementation/quickstart",
-        "implementation/l1-deployment",
-        "implementation/l2-deployment",
-        "implementation/l3-deployment",
-        "implementation/hardening-checklist",
-        "implementation/ci-cd-integration"
-      ]
-    },
-    {
-      "group": "Security Testing",
-      "pages": [
-        "testing/overview",
-        "testing/automated-audit",
-        "testing/penetration-testing",
-        "testing/verification-procedures"
-      ]
-    },
-    {
-      "group": "Compliance",
-      "pages": [
-        "compliance/overview",
-        "compliance/evidence-collection",
-        "compliance/reporting",
-        "compliance/continuous-monitoring"
-      ]
-    },
-    {
-      "group": "Incident Response",
-      "pages": [
-        "incident-response/overview",
-        "incident-response/playbooks",
-        "incident-response/recovery",
-        "incident-response/post-incident"
-      ]
-    },
-    {
-      "group": "Appendices",
-      "pages": [
-        "appendices/standards-mapping",
-        "appendices/glossary",
-        "appendices/changelog"
       ]
     }
   ],

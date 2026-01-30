@@ -1,315 +1,70 @@
 ---
-title: 'OSSASAI - Open Security Standard for Agentic Systems'
-description: 'A global, open standard for securing tool-enabled AI agent runtimes'
-sidebarTitle: 'Introduction'
+title: 'OCSAS - OpenClaw Security Assurance Standard'
+description: 'OSSASAI implementation profile for the OpenClaw AI agent gateway'
 ---
 
-<img
-  className="block dark:hidden"
-  src="/images/hero-light.svg"
-  alt="OSSASAI Framework"
-/>
-<img
-  className="hidden dark:block"
-  src="/images/hero-dark.svg"
-  alt="OSSASAI Framework"
-/>
+## Overview
 
-## Abstract
+**OCSAS** (OpenClaw Security Assurance Standard) is the official [OSSASAI](https://github.com/gensecaihq/ossasai) implementation profile for [OpenClaw](https://openclaw.ai) — a WhatsApp, Telegram, Discord, iMessage, and Slack gateway for AI agents with shell, filesystem, and browser access.
 
-AI agent systems represent a paradigm shift in human-computer interaction, converting model outputs into real-world actions through tools, persistent state, and control planes. This architectural evolution introduces a dominant risk class: **coercion combined with misconfiguration**. Empirical analysis demonstrates that severe security incidents in agentic systems frequently occur without exploiting traditional software vulnerabilities—they arise when untrusted inputs manipulate agents into unsafe tool invocations, or when operators inadvertently expose administrative surfaces, credentials, or browsing endpoints.
-
-**OSSASAI** (Open Security Standard for Agentic Systems) establishes a vendor-neutral, globally-applicable security framework for AI agent runtimes. Drawing from established security research methodologies and international standards, OSSASAI provides a rigorous foundation for securing the emerging class of autonomous and semi-autonomous AI systems.
+This profile maps OSSASAI's 24 security controls to OpenClaw's built-in security features, providing a structured verification framework for secure deployments.
 
 <Note>
-**Normative Definition:** OSSASAI specifies baseline security controls, evidence requirements, and conformance verification procedures for AI agent systems that accept untrusted inputs and execute actions with real-world consequences via tool interfaces.
+**Parent Framework:** OCSAS implements [OSSASAI](https://github.com/gensecaihq/ossasai) (Open Security Standard for Agentic Systems) — a vendor-neutral security framework for AI agent systems.
 </Note>
-
-## Motivation and Research Context
-
-### The Agentic Security Gap
-
-Contemporary AI security research has predominantly focused on model-level concerns: alignment, adversarial robustness, and output safety. However, the deployment of AI agents in production environments surfaces a distinct threat surface at the **runtime layer**—where models interface with tools, state, and external systems.
-
-Prior work in this domain includes:
-- **Prompt Injection Research** (Perez & Ribeiro, 2022; Greshake et al., 2023)
-- **LLM Security Taxonomies** (OWASP Top 10 for LLMs, 2023)
-- **Agent Safety Frameworks** (Kinniment et al., 2024)
-
-OSSASAI synthesizes these research threads into an actionable control framework, addressing the gap between theoretical security analysis and operational deployment requirements.
-
-### Design Principles
-
-OSSASAI is constructed on five foundational principles derived from security engineering best practices:
-
-<AccordionGroup>
-  <Accordion title="Principle 1: Vendor Neutrality" icon="globe">
-    OSSASAI maintains strict independence from any specific AI agent platform, model provider, or deployment architecture. Ecosystem-specific implementations are delegated to **profiles**—formal mappings that translate generic controls to concrete configurations. This separation ensures broad applicability while enabling platform-specific optimization.
-
-    *Reference: ISO/IEC 27001 Annex A control structure methodology*
-  </Accordion>
-  <Accordion title="Principle 2: Threat-Centric Design" icon="crosshairs">
-    Controls are derived from empirical threat analysis rather than prescriptive technology requirements. OSSASAI addresses documented failure modes including:
-    - Prompt injection leading to tool misuse (Greshake et al., 2023)
-    - Privilege escalation via over-permissioned tool interfaces
-    - Control plane exposure and authentication bypass
-    - Session boundary violations enabling cross-tenant data leakage
-    - Secrets exfiltration through logs, memory, and telemetry channels
-
-    *Reference: STRIDE threat modeling (Microsoft SDL)*
-  </Accordion>
-  <Accordion title="Principle 3: Verifiability" icon="check-double">
-    Every control includes formally specified verification procedures. Controls without testable acceptance criteria are excluded from the normative specification. This enables:
-    - Automated compliance verification
-    - Reproducible security assessments
-    - Continuous conformance monitoring
-
-    *Reference: NIST SP 800-53A Assessment Procedures*
-  </Accordion>
-  <Accordion title="Principle 4: Tiered Maturity Model" icon="stairs">
-    Three assurance levels (L1–L3) provide graduated security requirements aligned with deployment risk profiles. This tiered approach:
-    - Reduces barrier to entry for lower-risk deployments
-    - Establishes clear progression paths for security maturation
-    - Enables risk-proportionate control implementation
-
-    *Reference: CMMI maturity level framework; OWASP ASVS level structure*
-  </Accordion>
-  <Accordion title="Principle 5: Actionable Guidance" icon="hammer">
-    OSSASAI provides implementation guidance, not merely requirements. Each control includes:
-    - Remediation procedures
-    - Platform-agnostic configuration examples
-    - Evidence collection specifications
-
-    *Reference: CIS Benchmark implementation methodology*
-  </Accordion>
-</AccordionGroup>
-
-## Framework Components
-
-OSSASAI comprises five integrated components:
-
-<CardGroup cols={2}>
-  <Card
-    title="1. Threat Model"
-    icon="skull"
-    href="/threat-model/overview"
-  >
-    Formal adversary taxonomy (A1–A5), attack vector enumeration, and AI Agent Threat Taxonomy (AATT) with quantitative risk scoring
-  </Card>
-  <Card
-    title="2. Control Catalog"
-    icon="shield-check"
-    href="/controls/overview"
-  >
-    ~20 security controls across 7 domains using RFC 2119 normative language with automated verification procedures
-  </Card>
-  <Card
-    title="3. Assurance Levels"
-    icon="layer-group"
-    href="/spec/assurance-levels"
-  >
-    Three conformance tiers (L1/L2/L3) mapping deployment risk to control requirements
-  </Card>
-  <Card
-    title="4. Evidence Framework"
-    icon="file-certificate"
-    href="/compliance/evidence-collection"
-  >
-    Standardized artifact specifications supporting audits and reproducible security assessments
-  </Card>
-  <Card
-    title="5. Profile Mechanism"
-    icon="puzzle-piece"
-    href="/profiles/openclaw"
-  >
-    Ecosystem-specific implementation mappings enabling platform-tailored compliance
-  </Card>
-</CardGroup>
-
-## OSSASAI Top 10: Primary Failure Modes
-
-Based on empirical analysis of agent system incidents and security research literature, OSSASAI prioritizes the following failure modes:
-
-| Rank | Failure Mode | Description | Primary Controls |
-|:----:|--------------|-------------|------------------|
-| 1 | **Prompt Injection → Tool Misuse** | Adversarial inputs coerce agents into unintended tool invocations | TB-01, TB-02, ID-02 |
-| 2 | **Over-Privileged Tools** | Tool interfaces granted excessive capabilities violating least privilege | TB-01, TB-02, TB-04 |
-| 3 | **Control Plane Exposure** | Administrative interfaces accessible to unauthorized parties | CP-01, CP-02, CP-03 |
-| 4 | **Session Boundary Collapse** | Cross-user context leakage and instruction carryover | ID-02, ID-03 |
-| 5 | **Secrets Exfiltration** | Credential leakage via logs, memory, telemetry, or backups | LS-01, LS-02 |
-| 6 | **Unsafe External Connectivity** | SSRF-like patterns and data exfiltration through tool interfaces | TB-03, TB-04 |
-| 7 | **Extension Supply Chain** | Unreviewed plugins and skills introducing malicious functionality | SC-01, SC-02 |
-| 8 | **Memory Poisoning** | Retrieval-augmented attacks and instruction smuggling | LS-03 |
-| 9 | **Insufficient Auditability** | Missing action ledgers and approval traceability | TB-02, LS-04 |
-| 10 | **Configuration Drift** | Absence of posture verification enabling security regression | CP-01, CP-02 |
-
-## Canonical Trust Boundary Model
-
-OSSASAI defines four trust boundaries representing security-relevant interfaces in agent architectures:
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     OSSASAI Trust Boundary Reference Model                   │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   ┌───────────────────────────────────────────────────────────────────┐     │
-│   │                    B1 — Inbound Identity Boundary                  │     │
-│   │                                                                    │     │
-│   │   Threat Surface: Untrusted message senders, web inputs,          │     │
-│   │                   external channels, prompt injection vectors      │     │
-│   │   Security Function: Input validation, peer verification,         │     │
-│   │                      coercion resistance                          │     │
-│   └───────────────────────────────────────────────────────────────────┘     │
-│                                    │                                         │
-│                                    ▼                                         │
-│   ┌───────────────────────────────────────────────────────────────────┐     │
-│   │                    B2 — Control Plane Boundary                     │     │
-│   │                                                                    │     │
-│   │   Threat Surface: Administrative UI/API/CLI, configuration        │     │
-│   │                   interfaces, approval workflows                   │     │
-│   │   Security Function: Authentication, authorization,               │     │
-│   │                      exposure control                             │     │
-│   └───────────────────────────────────────────────────────────────────┘     │
-│                                    │                                         │
-│                                    ▼                                         │
-│   ┌───────────────────────────────────────────────────────────────────┐     │
-│   │                       B3 — Tool Boundary                           │     │
-│   │                                                                    │     │
-│   │   Threat Surface: Tool invocation interfaces, capability          │     │
-│   │                   grants, external system connectors               │     │
-│   │   Security Function: Least privilege, sandboxing,                 │     │
-│   │                      approval gates, egress control               │     │
-│   └───────────────────────────────────────────────────────────────────┘     │
-│                                    │                                         │
-│                                    ▼                                         │
-│   ┌───────────────────────────────────────────────────────────────────┐     │
-│   │                      B4 — Local State Boundary                     │     │
-│   │                                                                    │     │
-│   │   Threat Surface: Credential storage, logs, memory/context,       │     │
-│   │                   transcripts, caches, backup systems              │     │
-│   │   Security Function: Secrets protection, redaction,               │     │
-│   │                      retention controls, memory safety            │     │
-│   └───────────────────────────────────────────────────────────────────┘     │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-## Assurance Level Summary
-
-| Level | Designation | Target Deployment | Risk Profile |
-|:-----:|-------------|-------------------|--------------|
-| **L1** | Local-First Baseline | Single operator, local administration, minimal network exposure | Hobby/personal use, developer workstations |
-| **L2** | Network-Aware | Remote access via LAN/VPN/tailnet, team usage, remote control plane | Small teams, internal tools, controlled environments |
-| **L3** | High-Risk Runtime | Tool-rich, plugin-heavy, multi-tenant, broad external connectivity | Enterprise deployment, regulated industries, high-value targets |
-
-## Profile System: OCSAS for OpenClaw
-
-**OCSAS** (OpenClaw Security Assurance Standard) serves as the reference implementation profile, demonstrating the OSSASAI profile mechanism:
-
-```yaml
-# Profile metadata
-profile_id: OSSASAI-PROFILE-OPENCLAW-OCSAS-0.1
-platform: OpenClaw
-version: 0.1.0
-
-# Example control mapping
-mappings:
-  OSSASAI-CP-01:
-    config_key: gateway.bind
-    default: "127.0.0.1:18789"
-    verification: "openclaw security audit --deep"
-
-  OSSASAI-ID-02:
-    config_key: session.dmScope
-    options: ["per-channel-peer", "per-account-channel-peer"]
-    verification: "openclaw test session-isolation"
-```
-
-See the [OpenClaw Profile (OCSAS)](/profiles/openclaw) for complete implementation guidance.
 
 ## Quick Start
 
-<Steps>
-  <Step title="Determine Assurance Level">
-    Review [assurance level criteria](/spec/assurance-levels) to identify appropriate target level based on deployment risk profile.
-  </Step>
-  <Step title="Select Implementation Profile">
-    For OpenClaw deployments, use [OCSAS](/profiles/openclaw). For other platforms, implement controls per the generic [specification](/spec/overview).
-  </Step>
-  <Step title="Execute Security Audit">
-    ```bash
-    # OpenClaw profile
-    openclaw security audit --deep
+```bash
+# Run security audit
+openclaw security audit
 
-    # Generic OSSASAI
-    ./ossasai-audit.sh --level L2
-    ```
-  </Step>
-  <Step title="Remediate Findings">
-    Address identified gaps using [implementation guides](/implementation/quickstart).
-  </Step>
-  <Step title="Generate Evidence">
-    Collect [required artifacts](/compliance/evidence-collection) for compliance verification.
-  </Step>
-</Steps>
+# Deep audit with Gateway probe
+openclaw security audit --deep
 
-## Conformance and Certification
+# Auto-fix common issues
+openclaw security audit --fix
+```
 
-### Self-Assessment
+## What OCSAS Maps
 
-Organizations may conduct self-assessment using:
-- OSSASAI audit tooling (`ossasai-audit.sh`)
-- Evidence collection procedures
-- Conformance report templates
+| OSSASAI Control | OpenClaw Feature |
+|-----------------|------------------|
+| CP-01: Default-Deny Exposure | `gateway.bind: "loopback"` |
+| CP-02: Strong Auth | `gateway.auth.mode: "token"` |
+| ID-01: Peer Verification | `dmPolicy: "pairing"` |
+| ID-02: Session Isolation | `session.dmScope` |
+| TB-01: Least Privilege | `agents.list[].tools.allow/deny` |
+| TB-03: Sandboxing | `agents.defaults.sandbox.mode` |
+| LS-01: Secrets Protection | `~/.openclaw/` permissions |
+| LS-02: Log Redaction | `logging.redactSensitive` |
+| NS-04: mDNS Security | `discovery.mdns.mode` |
 
-### Third-Party Verification
+## Assurance Levels
 
-For L3 deployments and formal certification, OSSASAI supports:
-- Independent security assessments
-- Formal verification evidence review
-- Continuous compliance monitoring
+| Level | Name | OpenClaw Configuration |
+|-------|------|------------------------|
+| **L1** | Local-First | Loopback binding, basic auth, pairing |
+| **L2** | Network-Aware | Tailscale/SSH, sandboxing, mention gating |
+| **L3** | High-Assurance | Full sandboxing, strict isolation |
 
-## Governance and Development
+## Resources
 
-### Working Group
+<CardGroup cols={2}>
+  <Card title="OpenClaw Profile" icon="claw" href="/profiles/openclaw">
+    Complete control mappings and verification procedures
+  </Card>
+  <Card title="OSSASAI Framework" icon="shield-halved" href="https://github.com/gensecaihq/ossasai">
+    Parent security standard specification
+  </Card>
+  <Card title="OpenClaw Security Docs" icon="book" href="https://docs.openclaw.ai/gateway/security">
+    Official OpenClaw security documentation
+  </Card>
+  <Card title="OpenClaw Sandboxing" icon="box" href="https://docs.openclaw.ai/gateway/sandboxing">
+    Docker-based tool sandboxing guide
+  </Card>
+</CardGroup>
 
-OSSASAI is maintained by an open community working group. Participation is open to:
-- Security researchers
-- Platform developers
-- Enterprise security practitioners
-- Academic institutions
+## Version
 
-### Contribution Process
-
-1. **Issues**: Report gaps, propose new controls, identify errors
-2. **Proposals**: Submit formal control proposals with threat justification
-3. **Reviews**: Participate in community review of proposed changes
-4. **Profiles**: Develop and submit ecosystem-specific profiles
-
-## Document Status
-
-<Note>
-**OSSASAI Version:** 0.1.0 (January 2025)
-**Status:** Public Draft — Community Review
-**License:** CC BY 4.0 (Creative Commons Attribution 4.0 International)
-
-This specification is under active development. The working group welcomes contributions, reviews, and implementation feedback.
-</Note>
-
-## References
-
-### Normative References
-
-- RFC 2119: Key words for use in RFCs to Indicate Requirement Levels
-- RFC 8174: Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words
-
-### Informative References
-
-- Greshake, K., et al. (2023). "Not What You've Signed Up For: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection." *arXiv:2302.12173*
-- Perez, F., & Ribeiro, I. (2022). "Ignore This Title and HackAPrompt: Exposing Systemic Vulnerabilities of LLMs through a Global Scale Prompt Hacking Competition." *EMNLP 2023*
-- Kinniment, M., et al. (2024). "Evaluating Language-Model Agents on Realistic Autonomous Tasks." *arXiv:2312.11671*
-- OWASP. (2023). "OWASP Top 10 for Large Language Model Applications."
-- NIST. (2024). "Artificial Intelligence Risk Management Framework (AI RMF 1.0)."
-- ISO/IEC 27001:2022. Information Security Management Systems.
-- NIST SP 800-53 Rev. 5. Security and Privacy Controls for Information Systems and Organizations.
-- MITRE ATT&CK Framework. Adversarial Tactics, Techniques, and Common Knowledge.
+**OCSAS v0.1.0** — January 2025
