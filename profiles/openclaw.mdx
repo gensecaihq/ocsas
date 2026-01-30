@@ -59,16 +59,29 @@ openclaw security audit --fix
 
 # Full diagnostic report (secrets redacted)
 openclaw status --all
+
+# Gateway status (if installed as service)
+openclaw gateway status
+
+# Configuration issues
+openclaw doctor
+openclaw doctor --fix
 ```
 
 **What the audit checks:**
 - Inbound access (DM policies, group policies, allowlists)
 - Tool blast radius (elevated tools + open rooms)
 - Network exposure (Gateway bind/auth, Tailscale Serve/Funnel)
-- Browser control exposure (remote nodes, relay ports)
-- Local disk hygiene (permissions, symlinks, synced folders)
-- Plugin allowlists
+- Browser control exposure (remote nodes, relay ports, remote CDP endpoints)
+- Local disk hygiene (permissions, symlinks, config includes, synced folders)
+- Plugin allowlists (extensions exist without explicit allowlist)
 - Model hygiene (warns on legacy models with tools enabled)
+- Control UI security settings (`allowInsecureAuth`, `dangerouslyDisableDeviceAuth`)
+
+**What `--fix` applies:**
+- Tightens `groupPolicy="open"` to `groupPolicy="allowlist"`
+- Turns `logging.redactSensitive="off"` back to `"tools"`
+- Tightens local permissions (`~/.openclaw` → 700, config → 600)
 
 ---
 
@@ -98,6 +111,13 @@ openclaw status --all
 ```bash
 openclaw security audit --deep
 # Check: "Gateway exposure" section should show loopback-only
+```
+
+**Web Search Configuration:**
+```bash
+# Configure Brave Search API for web search tool
+openclaw configure --section web
+# Stores in tools.web.search.apiKey
 ```
 
 **Evidence:**
@@ -139,6 +159,20 @@ openclaw doctor --generate-gateway-token
 ```bash
 openclaw security audit --deep
 # Check Gateway auth status in output
+```
+
+**Control UI Security:**
+```json5
+{
+  gateway: {
+    controlUi: {
+      // Allows token-only auth when device identity is omitted (security downgrade)
+      allowInsecureAuth: false,    // Keep false unless debugging
+      // Break-glass only: disables device identity checks entirely
+      dangerouslyDisableDeviceAuth: false  // Keep false
+    }
+  }
+}
 ```
 
 **OpenClaw Docs:** [Security - Gateway WebSocket Auth](https://docs.openclaw.ai/gateway/security#05-lock-down-the-gateway-websocket-local-auth)
@@ -198,6 +232,11 @@ openclaw security audit
 **Evidence:**
 - Distinct credential paths on disk
 - `openclaw security audit` identity checks
+
+**Command Authorization Model:**
+- Slash commands and directives are only honored for **authorized senders**
+- Authorization derived from channel allowlists/pairing + `commands.useAccessGroups`
+- `/exec` is session-only convenience for authorized operators; does not write config
 
 **OpenClaw Docs:** [Security - Command Authorization](https://docs.openclaw.ai/gateway/security#command-authorization-model)
   </Accordion>
@@ -378,12 +417,30 @@ openclaw sandbox explain
 }
 ```
 
-**Node Execution Control:**
-```bash
-# Approval required for nodes.run
-# Configured via node command allowlist + declared commands
-# Approvals are tokenized to prevent replay
+**Node Execution Control (`system.run`):**
+If a macOS node is paired, the Gateway can invoke `system.run` on that node (remote code execution):
+- Requires node pairing (approval + token)
+- Controlled on Mac via **Settings → Exec approvals** (security/ask/allowlist)
+- To disable: set security to "deny" and remove node pairing
+
+```json5
+{
+  gateway: {
+    nodes: {
+      browser: {
+        mode: "off"  // Disable browser proxy routing when not needed
+      }
+    }
+  }
+}
 ```
+
+**Dynamic Skills Security:**
+OpenClaw can refresh the skills list mid-session:
+- **Skills watcher:** changes to `SKILL.md` can update skills on next agent turn
+- **Remote nodes:** connecting a macOS node can make macOS-only skills eligible
+
+**Mitigation:** Treat skill folders as trusted code and restrict who can modify them.
 
 **Verification:**
 ```bash
@@ -462,6 +519,15 @@ openclaw sandbox explain
 }
 ```
 
+**Browser Control Risks:**
+- Browser profiles may contain logged-in sessions; model can access those accounts
+- Use a dedicated profile for the agent (default: `openclaw` profile)
+- Avoid pointing the agent at your personal daily-driver profile
+- Keep host browser control disabled for sandboxed agents
+- Treat browser downloads as untrusted input
+- Disable browser sync/password managers in agent profile
+- Chrome extension relay mode can take over existing Chrome tabs
+
 **Verification:**
 ```bash
 openclaw security audit
@@ -494,13 +560,25 @@ ls -la ~/.openclaw/
 # -rw------- (600) ~/.openclaw/credentials/*.json
 ```
 
-**Sensitive Paths:**
+**Credential Storage Map:**
 | Path | Contains |
 |------|----------|
-| `~/.openclaw/openclaw.json` | Config with tokens |
-| `~/.openclaw/credentials/` | Channel credentials, pairing allowlists |
+| `~/.openclaw/openclaw.json` | Config with tokens (gateway, remote) |
+| `~/.openclaw/credentials/whatsapp/<accountId>/creds.json` | WhatsApp credentials |
+| `~/.openclaw/credentials/<channel>-allowFrom.json` | Pairing allowlists |
+| `~/.openclaw/credentials/oauth.json` | Legacy OAuth import |
 | `~/.openclaw/agents/<id>/agent/auth-profiles.json` | API keys, OAuth tokens |
 | `~/.openclaw/agents/<id>/sessions/*.jsonl` | Session transcripts |
+| `~/.openclaw/extensions/**` | Installed plugins + node_modules |
+| `~/.openclaw/sandboxes/**` | Tool sandbox workspaces |
+
+**Channel Token Locations:**
+| Channel | Location |
+|---------|----------|
+| WhatsApp | `~/.openclaw/credentials/whatsapp/<accountId>/creds.json` |
+| Telegram | Config/env or `channels.telegram.tokenFile` |
+| Discord | Config/env (token file not yet supported) |
+| Slack | Config/env (`channels.slack.*`) |
 
 **OpenClaw Docs:** [Security - Secrets on Disk](https://docs.openclaw.ai/gateway/security#07-secrets-on-disk-whats-sensitive)
   </Accordion>
@@ -565,6 +643,20 @@ openclaw status --all
 - Use read-only/tool-disabled reader agent for untrusted content
 - Keep `web_search`/`web_fetch`/`browser` off for tool-enabled agents
 - Keep secrets out of prompts; use env/config on gateway host
+
+**Model Strength (Security Note):**
+Prompt injection resistance is **not** uniform across model tiers:
+- **Use latest generation, best-tier model** for any bot with tools
+- **Avoid weaker tiers** (e.g., Sonnet/Haiku) for tool-enabled agents or untrusted inboxes
+- If using smaller models: reduce blast radius (read-only tools, strong sandboxing)
+- For smaller models: enable sandboxing for **all** sessions and disable `web_search`/`web_fetch`/`browser`
+- **Recommended:** Anthropic Opus 4.5 (instruction-hardened, good at recognizing prompt injections)
+
+**Verbose Output Warning:**
+`/reasoning` and `/verbose` can expose internal reasoning or tool output not meant for public channels:
+- Keep them disabled in public rooms
+- Enable only in trusted DMs or tightly controlled rooms
+- Verbose output can include tool args, URLs, and data the model saw
 
 **OpenClaw Docs:** [Security - Prompt Injection](https://docs.openclaw.ai/gateway/security#prompt-injection-what-it-is-why-it-matters)
   </Accordion>
@@ -817,6 +909,131 @@ cat ~/.openclaw/extensions/<pluginId>/package.json
 
 ---
 
+## Per-Agent Access Profiles
+
+OpenClaw supports multi-agent routing with per-agent sandbox + tool policies:
+
+<Tabs>
+  <Tab title="Full Access (No Sandbox)">
+```json5
+{
+  agents: {
+    list: [{
+      id: "personal",
+      workspace: "~/.openclaw/workspace-personal",
+      sandbox: { mode: "off" }
+    }]
+  }
+}
+```
+  </Tab>
+  <Tab title="Read-Only Tools">
+```json5
+{
+  agents: {
+    list: [{
+      id: "family",
+      workspace: "~/.openclaw/workspace-family",
+      sandbox: {
+        mode: "all",
+        scope: "agent",
+        workspaceAccess: "ro"
+      },
+      tools: {
+        allow: ["read"],
+        deny: ["write", "edit", "apply_patch", "exec", "process", "browser"]
+      }
+    }]
+  }
+}
+```
+  </Tab>
+  <Tab title="No Filesystem Access">
+```json5
+{
+  agents: {
+    list: [{
+      id: "public",
+      workspace: "~/.openclaw/workspace-public",
+      sandbox: {
+        mode: "all",
+        scope: "agent",
+        workspaceAccess: "none"
+      },
+      tools: {
+        allow: ["sessions_list", "sessions_history", "sessions_send"],
+        deny: ["read", "write", "edit", "exec", "process", "browser"]
+      }
+    }]
+  }
+}
+```
+  </Tab>
+</Tabs>
+
+**Use Cases:**
+| Profile | Access Level | Sandboxing |
+|---------|--------------|------------|
+| Personal | Full access | None |
+| Family/Work | Read-only tools | Sandboxed |
+| Public | No filesystem/shell | Sandboxed |
+
+**OpenClaw Docs:** [Multi-Agent Sandbox & Tools](https://docs.openclaw.ai/multi-agent-sandbox-tools)
+
+---
+
+## Configuration Security
+
+### Strict Config Validation
+
+OpenClaw only accepts configurations that fully match the schema. Unknown keys, malformed types, or invalid values cause the Gateway to **refuse to start** for safety.
+
+```bash
+# When validation fails, run:
+openclaw doctor          # See exact issues
+openclaw doctor --fix    # Apply migrations/repairs
+```
+
+### Config Includes (`$include`)
+
+Split configs can include sensitive files:
+```json5
+{
+  agents: { "$include": "./agents.json5" },
+  broadcast: { "$include": ["./clients/mueller.json5"] }
+}
+```
+
+**Security:** Treat included config files with same sensitivity as main config. Keep permissions tight (600).
+
+### Environment Variable Substitution
+
+Reference env vars in config using `${VAR_NAME}` syntax:
+```json5
+{
+  gateway: {
+    auth: {
+      token: "${OPENCLAW_GATEWAY_TOKEN}"
+    }
+  },
+  models: {
+    providers: {
+      custom: {
+        apiKey: "${CUSTOM_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+**Security Rules:**
+- Only uppercase env var names are matched: `[A-Z_][A-Z0-9_]*`
+- Missing or empty env vars throw an error at config load
+- Escape with `$${VAR}` to output literal `${VAR}`
+- Prefer env vars for secrets over hardcoding in config files
+
+---
+
 ## Conformance Recipes
 
 ### L1 — Local-First Baseline
@@ -861,6 +1078,16 @@ netstat -an | grep 18789
 
 # Check permissions
 ls -la ~/.openclaw/
+```
+  </Step>
+  <Step title="Test End-to-End">
+```bash
+# Open Control UI (no channel setup needed)
+openclaw dashboard
+# Or: http://127.0.0.1:18789/
+
+# Send test message (if channel configured)
+openclaw message send --target +15555550123 --message "Test"
 ```
   </Step>
 </Steps>
@@ -1011,6 +1238,37 @@ ls -lt ~/.openclaw/agents/*/sessions/*.jsonl | head -10
 ```
 
 **OpenClaw Docs:** [Security - Incident Response](https://docs.openclaw.ai/gateway/security#incident-response)
+
+---
+
+## Security Audit Priority Order
+
+When the audit prints findings, address them in this priority order:
+
+1. **"Open" + tools enabled** — Lock down DMs/groups first (pairing/allowlists), then tighten tool policy/sandboxing
+2. **Public network exposure** — LAN bind, Funnel, missing auth → fix immediately
+3. **Browser control remote exposure** — Treat like operator access (tailnet-only, pair nodes deliberately)
+4. **Permissions** — Ensure state/config/credentials/auth are not group/world-readable
+5. **Plugins/extensions** — Only load what you explicitly trust
+6. **Model choice** — Prefer modern, instruction-hardened models for any bot with tools
+
+---
+
+## Trust Hierarchy
+
+```
+Owner (Operator)
+  │ Full trust
+  ▼
+AI Agent
+  │ Trust but verify
+  ▼
+Approved contacts (allowlist)
+  │ Limited trust
+  ▼
+Strangers
+  │ No trust
+```
 
 ---
 
