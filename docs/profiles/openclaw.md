@@ -1,8 +1,8 @@
 ---
 layout: default
-title: OpenClaw Profile
-nav_order: 3
-parent: Introduction
+title: OpenClaw Security Profile
+nav_order: 1
+has_toc: true
 ---
 
 # OCSAS - OpenClaw Security Assurance Standard
