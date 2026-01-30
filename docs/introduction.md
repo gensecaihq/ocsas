@@ -1,7 +1,13 @@
 ---
-title: 'OCSAS - OpenClaw Security Assurance Standard'
-description: 'OSSASAI implementation profile for the OpenClaw AI agent gateway'
+layout: default
+title: Introduction
+nav_order: 2
+parent: Home
 ---
+
+# OCSAS - OpenClaw Security Assurance Standard
+
+OSSASAI implementation profile for the OpenClaw AI agent gateway
 
 ## Overview
 
@@ -9,9 +15,7 @@ description: 'OSSASAI implementation profile for the OpenClaw AI agent gateway'
 
 This profile maps OSSASAI's 24 security controls to OpenClaw's built-in security features, providing a structured verification framework for secure deployments.
 
-<Note>
-**Parent Framework:** OCSAS implements [OSSASAI](https://github.com/gensecaihq/ossasai) (Open Security Standard for Agentic Systems) — a vendor-neutral security framework for AI agent systems.
-</Note>
+> **Parent Framework:** OCSAS implements [OSSASAI](https://github.com/gensecaihq/ossasai) (Open Security Standard for Agentic Systems) — a vendor-neutral security framework for AI agent systems.
 
 ## Quick Start
 
@@ -50,20 +54,10 @@ openclaw security audit --fix
 
 ## Resources
 
-<CardGroup cols={2}>
-  <Card title="OpenClaw Profile" icon="claw" href="/profiles/openclaw">
-    Complete control mappings and verification procedures
-  </Card>
-  <Card title="OSSASAI Framework" icon="shield-halved" href="https://github.com/gensecaihq/ossasai">
-    Parent security standard specification
-  </Card>
-  <Card title="OpenClaw Security Docs" icon="book" href="https://docs.openclaw.ai/gateway/security">
-    Official OpenClaw security documentation
-  </Card>
-  <Card title="OpenClaw Sandboxing" icon="box" href="https://docs.openclaw.ai/gateway/sandboxing">
-    Docker-based tool sandboxing guide
-  </Card>
-</CardGroup>
+- **[OpenClaw Profile](profiles/openclaw.md)** - Complete control mappings and verification procedures
+- **[OSSASAI Framework](https://github.com/gensecaihq/ossasai)** - Parent security standard specification
+- **[OpenClaw Security Docs](https://docs.openclaw.ai/gateway/security)** - Official OpenClaw security documentation
+- **[OpenClaw Sandboxing](https://docs.openclaw.ai/gateway/sandboxing)** - Docker-based tool sandboxing guide
 
 ## Version
 

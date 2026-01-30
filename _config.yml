@@ -1,0 +1,86 @@
+# OCSAS - OpenClaw Security Assurance Standard
+# Jekyll configuration for GitHub Pages
+
+title: OCSAS
+description: OpenClaw Security Assurance Standard - Security checklist and hardening guide for OpenClaw users
+remote_theme: just-the-docs/just-the-docs
+
+# Repository information
+url: https://gensecaihq.github.io
+baseurl: /ocsas
+
+# Aux links for the upper right navigation
+aux_links:
+  "OCSAS on GitHub":
+    - "https://github.com/gensecaihq/ocsas"
+  "OSSASAI Framework":
+    - "https://github.com/gensecaihq/ossasai"
+  "OpenClaw":
+    - "https://openclaw.ai"
+
+# Enable copy button on code blocks
+enable_copy_code_button: true
+
+# Color scheme
+color_scheme: dark
+
+# Footer content
+footer_content: "OCSAS v0.1.0 - Security checklist for OpenClaw users"
+
+# Back to top link
+back_to_top: true
+back_to_top_text: "Back to top"
+
+# Heading anchor links
+heading_anchors: true
+
+# Search
+search_enabled: true
+search:
+  heading_level: 2
+  previews: 3
+  preview_words_before: 5
+  preview_words_after: 10
+  tokenizer_separator: /[\s/]+/
+  rel_url: true
+  button: false
+
+# Enable callouts
+callouts_level: quiet
+callouts:
+  highlight:
+    color: yellow
+  important:
+    title: Important
+    color: blue
+  new:
+    title: New
+    color: green
+  note:
+    title: Note
+    color: purple
+  warning:
+    title: Warning
+    color: red
+
+# Navigation structure
+nav_sort: case_insensitive
+nav_external_links:
+  - title: OpenClaw Docs
+    url: https://docs.openclaw.ai/gateway/security
+    hide_icon: false
+
+# Kramdown settings
+kramdown:
+  syntax_highlighter_opts:
+    block:
+      line_numbers: false
+
+# Exclude files from build
+exclude:
+  - .gitignore
+  - CHANGELOG.md
+  - LICENSE
+  - README.md
+  - SECURITY.md
+  - "*.mdx"
