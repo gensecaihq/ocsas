@@ -45,6 +45,9 @@ OpenClaw implements a defense-in-depth security model with the following layers:
 OpenClaw provides built-in OSSASAI-compatible security auditing:
 
 ```bash
+# Health check
+openclaw health
+
 # Basic security audit
 openclaw security audit
 
@@ -53,6 +56,9 @@ openclaw security audit --deep
 
 # Auto-fix common issues
 openclaw security audit --fix
+
+# Full diagnostic report (secrets redacted)
+openclaw status --all
 ```
 
 **What the audit checks:**
@@ -818,11 +824,27 @@ cat ~/.openclaw/extensions/<pluginId>/package.json
 <Steps>
   <Step title="Initial Setup">
 ```bash
-# Onboard with secure defaults
-openclaw setup
+# Full onboarding wizard (recommended)
+openclaw onboard --install-daemon
 
-# Start Gateway (loopback only)
+# Or minimal setup
+openclaw setup
+```
+  </Step>
+  <Step title="Start Gateway">
+```bash
+# Check if service is running (if installed via onboard)
+openclaw gateway status
+
+# Or start manually (loopback only)
 openclaw gateway --port 18789
+```
+  </Step>
+  <Step title="Verify Health">
+```bash
+# Quick health check
+openclaw health
+openclaw status --all
 ```
   </Step>
   <Step title="Run Security Audit">
